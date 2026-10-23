@@ -128,6 +128,9 @@ section>.stack{gap:12px}
 .install .t span{font-size:.8rem;opacity:.75}
 .install .btn{background:var(--eat);color:#fff;padding:9px 14px;flex:none}
 .install .x{background:none;border:0;color:var(--paper);opacity:.6;font-size:1.3rem;line-height:1;padding:4px 6px;flex:none}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.dbtn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 0;font-size:.78rem;font-weight:700;color:var(--muted)}
+.dbtn[aria-pressed="true"]{background:var(--eat);border-color:var(--eat);color:#fff}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
 .kbd{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-weight:600;background:var(--paper);white-space:nowrap}
 </style>
@@ -186,10 +189,13 @@ section>.stack{gap:12px}
         <h2>Nueva clase</h2>
         <div class="field"><label class="lbl" for="n-title">Nombre</label><input id="n-title" value="Spinning" maxlength="60" required></div>
         <div class="field"><label class="lbl" for="n-inst">Instructor (opcional)</label><input id="n-inst" maxlength="60"></div>
-        <div class="row2">
+        <div class="row2" style="grid-template-columns:1fr">
           <div class="field"><label class="lbl" for="n-when">Fecha y hora</label><input id="n-when" type="datetime-local" required></div>
           <div class="field"><label class="lbl" for="n-dur">Duración (min)</label><input id="n-dur" type="number" min="15" max="180" value="45" required></div>
         </div>
+        <div class="field"><span class="lbl">Repetir cada semana (opcional)</span><div class="days" id="n-days"></div></div>
+        <div class="field" id="n-until-wrap" hidden><label class="lbl" for="n-until">Repetir hasta</label><input id="n-until" type="date"></div>
+        <div class="muted" id="n-sum" style="font-size:.85rem" role="status"></div>
         <button class="btn eat" id="n-go" type="submit">Crear clase</button>
       </form>
       <div class="lbl">Administradores</div>
@@ -447,14 +453,51 @@ function seatAction(el){
 $("#room").addEventListener("click",e=>seatAction(e.target.closest(".seat")));
 $("#room").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){const s=e.target.closest(".seat");if(s){e.preventDefault();seatAction(s)}}});
 
-/* ---------- admin ---------- */
-$("#cform").addEventListener("submit",async e=>{e.preventDefault();
-  const btn=$("#n-go"),when=$("#n-when").value;if(!when)return;
-  btn.disabled=true;
-  const r=await sb.from("spin_classes").insert({title:$("#n-title").value.trim()||"Spinning",instructor:$("#n-inst").value.trim()||null,starts_at:new Date(when).toISOString(),duration_min:+$("#n-dur").value||45});
+/* ---------- admin: create classes (single or weekly recurring) ---------- */
+const DAYN=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"],MAX_CLASSES=100;
+$("#n-days").innerHTML=[1,2,3,4,5,6,0].map(d=>`<button type="button" class="dbtn" data-d="${d}" aria-pressed="false">${DAYN[d]}</button>`).join("");
+const pickedDays=()=>[...document.querySelectorAll("#n-days [aria-pressed=true]")].map(b=>+b.dataset.d);
+const pad2=n=>String(n).padStart(2,"0");
+const dateInput=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+// Start date/time = first possible class; repeats on the picked weekdays at the same time until the end date (inclusive)
+function occurrences(){
+  const when=$("#n-when").value;if(!when)return [];
+  const start=new Date(when),days=pickedDays();
+  if(!days.length)return [start];
+  const until=$("#n-until").value;if(!until)return [];
+  const end=new Date(until+"T23:59:59"),out=[],d=new Date(start);
+  while(d<=end&&out.length<=MAX_CLASSES){if(days.includes(d.getDay()))out.push(new Date(d));d.setDate(d.getDate()+1)}
+  return out;
+}
+function updateSummary(){
+  const days=pickedDays(),w=$("#n-until-wrap");
+  w.hidden=!days.length;
+  if(days.length&&!$("#n-until").value&&$("#n-when").value){const e=new Date($("#n-when").value);e.setDate(e.getDate()+28);$("#n-until").value=dateInput(e)}
+  const occ=occurrences(),el=$("#n-sum"),btn=$("#n-go");
   btn.disabled=false;
-  if(r.error){toast(dbError(r.error));return}
-  toast("Clase creada");$("#n-when").value="";await loadData();renderAll();
+  if(!occ.length){el.textContent=days.length?"Elige la fecha de inicio y hasta cuándo repetir.":"";btn.textContent="Crear clase";return}
+  if(occ.length>MAX_CLASSES){el.textContent=`Son demasiadas clases (máximo ${MAX_CLASSES}). Acorta la fecha final.`;btn.disabled=true;return}
+  const f=new Intl.DateTimeFormat("es-CR",{weekday:"short",day:"numeric",month:"short"});
+  el.textContent=!days.length?"":occ.length===1?`Se creará 1 clase: ${f.format(occ[0])}.`:`Se crearán ${occ.length} clases, del ${f.format(occ[0])} al ${f.format(occ[occ.length-1])}.`;
+  btn.textContent=occ.length>1?`Crear ${occ.length} clases`:"Crear clase";
+}
+$("#n-days").addEventListener("click",e=>{const b=e.target.closest(".dbtn");if(!b)return;b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true"));updateSummary()});
+["n-when","n-until"].forEach(id=>$("#"+id).addEventListener("input",updateSummary));
+$("#cform").addEventListener("submit",async e=>{e.preventDefault();
+  const btn=$("#n-go"),occ=occurrences();
+  if(!occ.length||occ.length>MAX_CLASSES)return;
+  const title=$("#n-title").value.trim()||"Spinning",instructor=$("#n-inst").value.trim()||null,dur=+$("#n-dur").value||45;
+  // skip classes that already exist at the same time with the same name
+  const have=new Set(S.classes.map(c=>c.title+"|"+new Date(c.starts_at).getTime()));
+  const rows=occ.filter(d=>!have.has(title+"|"+d.getTime())).map(d=>({title,instructor,starts_at:d.toISOString(),duration_min:dur}));
+  const skipped=occ.length-rows.length;
+  if(!rows.length){toast("Esas clases ya existen");return}
+  btn.disabled=true;
+  const r=await sb.from("spin_classes").insert(rows);
+  if(r.error){btn.disabled=false;toast(dbError(r.error));return}
+  toast(`${rows.length===1?"Clase creada":rows.length+" clases creadas"}${skipped?` (${skipped} ya existían)`:""}`);
+  $("#n-when").value="";$("#n-until").value="";document.querySelectorAll("#n-days .dbtn").forEach(b=>b.setAttribute("aria-pressed","false"));
+  updateSummary();await loadData();renderAll();
 });
 document.addEventListener("click",e=>{
   if(!e.target.closest("#delcls"))return;
