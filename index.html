@@ -131,6 +131,21 @@ section>.stack{gap:12px}
 .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .dbtn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 0;font-size:.78rem;font-weight:700;color:var(--muted)}
 .dbtn[aria-pressed="true"]{background:var(--eat);border-color:var(--eat);color:#fff}
+.cal{padding:12px}
+.cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-h b{font-family:var(--display);font-stretch:75%;font-weight:800;font-size:1.15rem}
+.cal-h button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:1.2rem;line-height:1}
+.cal-h button:disabled{opacity:.3}
+.cal-w,.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-w span{text-align:center;font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px}
+.cal-g button{aspect-ratio:1;border:0;background:none;border-radius:12px;position:relative;font-weight:600;font-size:.95rem;color:var(--muted);padding:0}
+.cal-g button.has{background:var(--eat-soft);color:var(--ink);font-weight:800}
+.cal-g button.sel{background:var(--ink);color:var(--paper)}
+.cal-g button.today:not(.sel){box-shadow:inset 0 0 0 2px var(--eat)}
+.cal-g button:disabled{opacity:.3}
+.cal-g button i{position:absolute;bottom:5px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--eat)}
+.cal-g button i.mine{background:var(--burn)}
+.cal-g button.sel i{background:var(--paper)}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
 .kbd{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-weight:600;background:var(--paper);white-space:nowrap}
 </style>
@@ -163,6 +178,8 @@ section>.stack{gap:12px}
       <button class="btn" id="installgo" type="button">Instalar</button>
       <button class="x" id="installno" type="button" aria-label="Ahora no">×</button>
     </div>
+    <div class="card cal" id="cal"></div>
+    <div class="lbl" id="cal-day"></div>
     <div class="stack" id="clist"></div>
   </div></section>
 
@@ -265,7 +282,7 @@ const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefr
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const S={user:null,name:"",admin:false,classes:[],res:[],names:{},roster:null,admins:null,current:null,tab:"clases",channel:null};
+const S={user:null,name:"",admin:false,classes:[],res:[],names:{},roster:null,admins:null,cal:{month:null,sel:null},current:null,tab:"clases",channel:null};
 let toastT;
 function toast(m){document.querySelectorAll(".toast").forEach(n=>n.remove());const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.append(t);clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),3200)}
 
@@ -359,9 +376,37 @@ function clsCard(c,opts={}){
   const pill=mine?`<span class="pill mine">Bici ${mine.bike}</span>`:go?`<span class="pill off">En curso</span>`:free<=0?`<span class="pill full">Llena</span>`:`<span class="pill">${free} libres</span>`;
   return `<button class="cls" type="button" data-cls="${esc(c.id)}"><div class="when"><b>${esc(fTime.format(d))}</b><span>${esc(cap1(fWd.format(d)))} ${esc(fDn.format(d))}</span></div><div class="info"><strong>${esc(c.title)}</strong><span>${esc(c.instructor?c.instructor+" · ":"")}${c.duration_min} min</span></div>${pill}</button>`;
 }
+/* ---------- calendar on the Clases tab ---------- */
+const dkey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const fMonth=new Intl.DateTimeFormat("es-CR",{month:"long",year:"numeric"});
+function keyToDate(k){const [y,m,d]=k.split("-");return new Date(+y,+m-1,+d)}
+function classesByDay(){const m={};for(const c of S.classes){(m[dkey(new Date(c.starts_at))]??=[]).push(c)}for(const k in m)m[k].sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));return m}
 function renderClasses(){
-  $("#clist").innerHTML=S.classes.length?S.classes.map(c=>clsCard(c)).join(""):`<div class="card muted">No hay clases programadas por ahora.</div>`;
+  const by=classesByDay(),todayK=dkey(new Date()),keys=Object.keys(by).sort().filter(k=>k>=todayK);
+  if(!S.cal.sel){S.cal.sel=by[todayK]?todayK:(keys[0]||todayK);const s=keyToDate(S.cal.sel);S.cal.month=new Date(s.getFullYear(),s.getMonth(),1)}
+  const first=S.cal.month,y=first.getFullYear(),mo=first.getMonth(),now=new Date();
+  const mineDays=new Set(S.classes.filter(c=>mineOf(c.id)).map(c=>dkey(new Date(c.starts_at))));
+  const offset=(first.getDay()+6)%7,dim=new Date(y,mo+1,0).getDate();   // week starts on Monday
+  let cells="<span></span>".repeat(offset);
+  for(let d=1;d<=dim;d++){
+    const dt=new Date(y,mo,d),k=dkey(dt),n=(by[k]||[]).length,past=k<todayK;
+    const cls=[n?"has":"",k===S.cal.sel?"sel":"",k===todayK?"today":""].filter(Boolean).join(" ");
+    cells+=`<button type="button" class="${cls}" data-day="${k}"${past?" disabled":""} aria-pressed="${k===S.cal.sel}" aria-label="${esc(fDay.format(dt))}, ${n?n+(n===1?" clase":" clases"):"sin clases"}">${d}${n?`<i class="${mineDays.has(k)?"mine":""}"></i>`:""}</button>`;
+  }
+  const atCurrent=y===now.getFullYear()&&mo===now.getMonth();
+  $("#cal").innerHTML=`<div class="cal-h"><button type="button" data-nav="-1" aria-label="Mes anterior"${atCurrent?" disabled":""}>‹</button><b>${esc(cap1(fMonth.format(first)))}</b><button type="button" data-nav="1" aria-label="Mes siguiente">›</button></div><div class="cal-w">${["L","M","X","J","V","S","D"].map(x=>`<span>${x}</span>`).join("")}</div><div class="cal-g">${cells}</div>`;
+  const sel=keyToDate(S.cal.sel),list=by[S.cal.sel]||[];
+  $("#cal-day").textContent=cap1(fDay.format(sel));
+  if(list.length){$("#clist").innerHTML=list.map(c=>clsCard(c)).join("");return}
+  const next=keys.find(k=>k>S.cal.sel);
+  $("#clist").innerHTML=`<div class="card muted">${S.classes.length?"No hay clases este día.":"No hay clases programadas por ahora."}${next?`<br><button class="linkbtn" type="button" data-day="${next}">Ver el próximo día con clases (${esc(fDn.format(keyToDate(next)))})</button>`:""}</div>`;
 }
+function calGo(k){S.cal.sel=k;const s=keyToDate(k);S.cal.month=new Date(s.getFullYear(),s.getMonth(),1);renderClasses()}
+document.addEventListener("click",e=>{
+  const dbtn=e.target.closest("[data-day]");if(dbtn&&!dbtn.disabled){calGo(dbtn.dataset.day);return}
+  const nav=e.target.closest("[data-nav]");
+  if(nav&&!nav.disabled){const m=S.cal.month;S.cal.month=new Date(m.getFullYear(),m.getMonth()+(+nav.dataset.nav),1);renderClasses()}
+});
 function renderMine(){
   const mine=S.classes.filter(c=>mineOf(c.id)&&!started(c));
   $("#mlist").innerHTML=mine.length?mine.map(c=>clsCard(c)).join(""):`<div class="card muted">Todavía no tienes reservas. Elige una clase y toca tu bici.</div>`;
@@ -568,7 +613,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
   if(session?.user)setTimeout(()=>startSession(session.user),0);
   else{
     if(S.channel){sb.removeChannel(S.channel);S.channel=null}
-    S.user=null;S.admin=false;S.name="";S.classes=[];S.res=[];S.current=null;closeSheet();$("#nscrim").hidden=true;showAuth(true);
+    S.user=null;S.admin=false;S.name="";S.classes=[];S.res=[];S.current=null;S.cal={month:null,sel:null};closeSheet();$("#nscrim").hidden=true;showAuth(true);
   }
 });
 
