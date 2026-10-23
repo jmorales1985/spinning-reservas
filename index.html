@@ -108,7 +108,7 @@ section>.stack{gap:12px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:2px solid var(--eat);background:var(--card)}
 .legend i.t{background:var(--line);border-color:var(--line)}
 .legend i.m{background:var(--burn);border-color:var(--burn)}
-.back{background:none;border:0;font-weight:700;padding:4px 0;color:var(--eat)}
+.back{background:none;border:0;font-weight:700;padding:4px 0;color:var(--eat);align-self:flex-start}
 .mybook{background:var(--burn-soft);border:1px solid var(--burn);border-radius:14px;padding:10px 14px;font-weight:600}
 
 /* sheet + toast */
@@ -192,6 +192,15 @@ section>.stack{gap:12px}
         </div>
         <button class="btn eat" id="n-go" type="submit">Crear clase</button>
       </form>
+      <div class="lbl">Administradores</div>
+      <div class="card stack">
+        <div id="admlist"></div>
+        <form id="admform" class="stack">
+          <div class="field"><label class="lbl" for="ad-email">Correo de la persona</label><input id="ad-email" type="email" inputmode="email" autocapitalize="off" required></div>
+          <button class="btn eat" id="ad-go" type="submit">Hacer administrador</button>
+          <div class="muted" style="font-size:.8rem">La persona debe tener su cuenta creada y confirmada.</div>
+        </form>
+      </div>
       <div class="lbl">Clases programadas</div>
       <div class="stack" id="alist"></div>
     </div>
@@ -250,7 +259,7 @@ const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefr
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const S={user:null,name:"",admin:false,classes:[],res:[],names:{},current:null,tab:"clases",channel:null};
+const S={user:null,name:"",admin:false,classes:[],res:[],names:{},roster:null,admins:null,current:null,tab:"clases",channel:null};
 let toastT;
 function toast(m){document.querySelectorAll(".toast").forEach(n=>n.remove());const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.append(t);clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),3200)}
 
@@ -313,10 +322,14 @@ async function loadData(){
   if(S.admin){
     const p=await sb.from("spin_profiles").select("user_id,display_name");
     S.names=p.error?{}:Object.fromEntries(p.data.map(x=>[x.user_id,x.display_name]));
+    // Admin-only RPCs (names + emails, admin list). They fail until supabase/admin_and_roster.sql has been run; the UI falls back gracefully.
+    const ro=await sb.rpc("spin_roster");S.roster=ro.error?null:ro.data;
+    const ad=await sb.rpc("spin_list_admins");S.admins=ad.error?null:ad.data;
   }
 }
 let refreshT;
 function refresh(){clearTimeout(refreshT);refreshT=setTimeout(async()=>{if(!S.user)return;try{await loadData();renderAll()}catch(e){console.error(e)}},250)}
+function whoIs(uid){const x=(S.roster||[]).find(r=>r.user_id===uid);return{name:x?.display_name||S.names[uid]||"Sin nombre",email:x?.email||""}}
 const resOf=id=>S.res.filter(r=>r.class_id===id);
 const mineOf=id=>S.res.find(r=>r.class_id===id&&r.user_id===S.user.id);
 const takenCount=c=>resOf(c.id).filter(r=>r.bike<=c.capacity).length;
@@ -349,6 +362,7 @@ function renderMine(){
 }
 function renderAdmin(){
   if(!S.admin){return}
+  $("#admlist").innerHTML=S.admins===null?`<div class="muted">Esta función todavía no está activada en la base de datos.</div>`:S.admins.map(a=>`<div class="rost" style="align-items:center"><span>${esc(a.display_name||"Sin nombre")}<br><span class="muted" style="font-size:.78rem">${esc(a.email||"")}</span></span>${a.user_id===S.user.id?`<span class="pill">Tú</span>`:`<button class="btn ghost" style="padding:6px 10px;font-size:.8rem" data-rmadm="${esc(a.user_id)}" type="button">Quitar</button>`}</div>`).join("");
   $("#alist").innerHTML=S.classes.length?S.classes.map(c=>clsCard(c)).join(""):`<div class="card muted">Sin clases.</div>`;
 }
 function renderClass(){
@@ -371,7 +385,7 @@ function renderClass(){
   const ro=$("#c-roster");ro.hidden=!S.admin;
   if(S.admin){
     const rows=[...resOf(c.id)].sort((a,b)=>a.bike-b.bike);
-    ro.innerHTML=`<div class="lbl" style="margin-bottom:6px">Lista (${rows.length})</div>`+(rows.length?rows.map(r=>`<div class="rost"><span>Bici ${r.bike}</span><span>${esc(S.names[r.user_id]||"Sin nombre")}</span></div>`).join(""):`<div class="muted">Nadie ha reservado.</div>`)+`<button class="btn ghost" id="delcls" type="button" style="margin-top:10px;width:100%">Eliminar clase</button>`;
+    ro.innerHTML=`<div class="lbl" style="margin-bottom:6px">Lista (${rows.length})</div>`+(rows.length?rows.map(r=>{const w=whoIs(r.user_id);return `<div class="rost"><span>Bici ${r.bike}</span><span style="text-align:right">${esc(w.name)}${w.email?`<br><span class="muted" style="font-size:.78rem">${esc(w.email)}</span>`:""}</span></div>`}).join(""):`<div class="muted">Nadie ha reservado.</div>`)+`<button class="btn ghost" id="delcls" type="button" style="margin-top:10px;width:100%">Eliminar clase</button>`;
   }
 }
 function openClass(id){
@@ -424,7 +438,7 @@ function seatAction(el){
   if(started(c)&&!S.admin){toast("La clase ya empezó");return}
   if(r&&r.user_id===S.user.id)return sheet(`Bici ${bike}`,`Es tu reserva de ${when}.`,[{label:"Cancelar mi reserva",cls:"burn",fn:()=>cancel(r)}]);
   if(r){
-    if(S.admin)return sheet(`Bici ${bike}`,`Reservada por ${S.names[r.user_id]||"alguien sin nombre"}.`,[{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}]);
+    if(S.admin)return sheet(`Bici ${bike}`,`Reservada por ${whoIs(r.user_id).name}${whoIs(r.user_id).email?" ("+whoIs(r.user_id).email+")":""}.`,[{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}]);
     toast("Esa bici ya está ocupada");return;
   }
   const mine=mineOf(c.id);
@@ -449,6 +463,25 @@ document.addEventListener("click",e=>{
     const d=await sb.from("spin_classes").delete().eq("id",c.id);
     if(d.error){toast(dbError(d.error));return}
     toast("Clase eliminada");await loadData();showView("admin");
+  }}]);
+});
+
+$("#admform").addEventListener("submit",async e=>{e.preventDefault();
+  const btn=$("#ad-go"),email=$("#ad-email").value.trim();if(!email)return;
+  btn.disabled=true;
+  const r=await sb.rpc("spin_add_admin",{p_email:email});
+  btn.disabled=false;
+  if(r.error){toast(S.admins===null?"Primero hay que activar la función en la base de datos":dbError(r.error));return}
+  if(r.data==="not_found"){toast("No encontré una cuenta confirmada con ese correo");return}
+  toast("Listo, ahora es administrador");$("#ad-email").value="";await loadData();renderAll();
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-rmadm]");if(!b)return;
+  const a=(S.admins||[]).find(x=>x.user_id===b.dataset.rmadm);
+  sheet("¿Quitar administrador?",`${a?.email||"Esta persona"} ya no podrá crear clases ni ver la lista de reservas.`,[{label:"Quitar permiso",cls:"burn",fn:async()=>{
+    const r=await sb.rpc("spin_remove_admin",{p_user:b.dataset.rmadm});
+    if(r.error||r.data!=="ok"){toast(r.error?dbError(r.error):"No se pudo quitar");return}
+    toast("Permiso quitado");await loadData();renderAll();
   }}]);
 });
 

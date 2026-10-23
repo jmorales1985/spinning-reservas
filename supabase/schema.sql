@@ -6,3 +6,4 @@
 --     insert/delete own rows only while the class has not started; admin can delete any. Realtime enabled.
 -- To make another person admin:
 --   insert into public.spin_admins (user_id) select id from auth.users where email = 'persona@correo.com';
+-- Admin management and roster with emails: supabase/admin_and_roster.sql (run once in the SQL Editor).
