@@ -1,0 +1,9 @@
+-- Applied to project pinto-pesas (jcsiaqyihunsacembumy) as migration spin_booking_schema.
+-- Tables are prefixed spin_ so they sit next to Pinto & Pesas without touching it.
+-- spin_admins(user_id)                      who can create/delete classes and see names
+-- spin_profiles(user_id, display_name)      own row, or admin reads all
+-- spin_classes(id, title, instructor, starts_at, duration_min, capacity<=26)   readable by signed-in users
+-- spin_reservations(class_id, bike 1..26, user_id)  unique(class_id,bike) and unique(class_id,user_id);
+--     insert/delete own rows only while the class has not started; admin can delete any. Realtime enabled.
+-- To make another person admin:
+--   insert into public.spin_admins (user_id) select id from auth.users where email = 'persona@correo.com';

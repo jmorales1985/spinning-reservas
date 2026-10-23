@@ -1,0 +1,528 @@
+<!doctype html>
+<!--
+  Spin Reservas
+  © 2026 Jason Morales Ramírez. Todos los derechos reservados.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#131713">
+<meta name="description" content="Reserva tu bici en la sala de spinning.">
+<meta name="author" content="Jason Morales Ramírez">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Spin">
+<title>Spin Reservas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Same visual language as Pinto & Pesas: paper/ink palette, Archivo display, green accent */
+:root{
+  --paper:#F3F5EF; --card:#FFFFFF; --ink:#131713; --muted:#5A6358; --line:#D6DACF;
+  --eat:#1D7A4C; --eat-soft:#DCEFE3; --burn:#C9450F; --burn-soft:#FBE3D6; --warn:#B42318;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --paper:#0E110F; --card:#171B18; --ink:#E8ECE5; --muted:#9BA497; --line:#2B322C;
+  --eat:#4EC389; --eat-soft:#16301F; --burn:#FF7D47; --burn-soft:#3A1E12; --warn:#FF6B5E; color-scheme:dark}}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--eat);outline-offset:2px}
+h2{font-family:var(--display);font-stretch:75%;font-weight:800;font-size:1.35rem;letter-spacing:.01em;margin:0;text-wrap:balance}
+.lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 110px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+input,select{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+input:focus,select:focus{border-color:var(--eat);outline:none}
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:700;background:var(--ink);color:var(--paper)}
+.btn:disabled{opacity:.55}
+.btn.eat{background:var(--eat);color:var(--card)}
+.btn.burn{background:var(--burn);color:#fff}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--ink)}
+.btn.big{padding:16px;font-size:1.05rem}
+.linkbtn{background:none;border:0;color:var(--eat);font-weight:600;padding:4px 0}
+
+/* auth */
+.auth{max-width:420px;margin:0 auto;padding-inline:16px;padding-block:12vh 40px;display:flex;flex-direction:column;gap:18px}
+.auth h1{font-family:var(--display);font-stretch:62%;font-weight:900;font-size:3rem;line-height:.95;margin:0;text-transform:uppercase;letter-spacing:.01em}
+.auth .tag{border-top:10px solid var(--ink);border-bottom:5px solid var(--ink);padding:8px 0;color:var(--muted)}
+#a-msg{min-height:1.2em;color:var(--burn);font-size:.9rem}
+.btn.bio{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--card);color:var(--ink);border:1.5px solid var(--ink);padding:14px 16px}
+.btn.bio svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.remember{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--muted);cursor:pointer}
+.remember input{width:18px;height:18px;accent-color:var(--eat);flex:none}
+.legal{font-size:.75rem;color:var(--muted);text-align:center;line-height:1.5}
+
+/* top bar + tabs */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);margin-inline:-16px;padding:10px 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.top b{font-family:var(--display);font-stretch:62%;font-weight:900;font-size:1.05rem;letter-spacing:.04em;text-transform:uppercase}
+.top .who{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50vw}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{flex:1;background:none;border:0;padding:12px 4px;font-weight:700;font-size:.82rem;color:var(--muted);border-top:3px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--ink);border-top-color:var(--eat)}
+section{padding-top:14px}
+section>.stack{gap:12px}
+
+/* class cards */
+.cls{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.cls .when{min-width:64px;text-align:center;border-right:1px solid var(--line);padding-right:12px}
+.cls .when b{display:block;font-family:var(--display);font-stretch:75%;font-weight:900;font-size:1.5rem;line-height:1}
+.cls .when span{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.cls .info{flex:1;min-width:0}
+.cls .info strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cls .info span{font-size:.85rem;color:var(--muted)}
+.pill{font-size:.72rem;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--eat-soft);color:var(--eat);white-space:nowrap}
+.pill.mine{background:var(--burn-soft);color:var(--burn)}
+.pill.full,.pill.off{background:var(--line);color:var(--muted)}
+
+/* room map */
+.room{padding:10px 6px 6px}
+.room svg{display:block;width:100%;height:auto;max-width:460px;margin:0 auto;touch-action:manipulation}
+.seat{cursor:pointer;outline:none}
+.seat .body{fill:var(--card);stroke:var(--eat);stroke-width:2}
+.seat text{font-family:var(--display);font-weight:800;font-size:12px;text-anchor:middle;dominant-baseline:central;fill:var(--ink);pointer-events:none}
+.seat.taken .body{fill:var(--line);stroke:var(--line)}
+.seat.taken text{fill:var(--muted)}
+.seat.mine .body{fill:var(--burn);stroke:var(--burn)}
+.seat.mine text{fill:#fff}
+.seat.off{cursor:default;opacity:.35}
+.seat.off .body{stroke:var(--line)}
+.seat:focus-visible .body,.seat:hover .body{stroke-width:3.5}
+.seat.taken:hover .body{stroke-width:2}
+.stage rect{fill:var(--ink)}
+.stage text{fill:var(--paper);font-family:var(--display);font-weight:800;font-size:11px;letter-spacing:.14em;text-anchor:middle;dominant-baseline:central}
+.legend{display:flex;gap:16px;justify-content:center;font-size:.8rem;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:2px solid var(--eat);background:var(--card)}
+.legend i.t{background:var(--line);border-color:var(--line)}
+.legend i.m{background:var(--burn);border-color:var(--burn)}
+.back{background:none;border:0;font-weight:700;padding:4px 0;color:var(--eat)}
+.mybook{background:var(--burn-soft);border:1px solid var(--burn);border-radius:14px;padding:10px 14px;font-weight:600}
+
+/* sheet + toast */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+.sheet p{margin:0;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:9px 14px;border-radius:10px;font-size:.88rem;z-index:20;max-width:calc(100% - 32px)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rost{display:flex;justify-content:space-between;gap:8px;font-size:.88rem;padding:4px 0;border-bottom:1px dashed var(--line)}
+.pk{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.85rem;padding:6px 0}
+</style>
+</head>
+<body>
+
+<main class="auth" id="auth" hidden>
+  <h1>Spin<br>Reservas</h1>
+  <div class="tag">Elige tu bici en la sala de spinning.</div>
+  <form id="aform" class="card stack">
+    <h2 id="a-title">Entrar</h2>
+    <div class="field"><label class="lbl" for="a-email">Correo</label><input id="a-email" type="email" autocomplete="username email" inputmode="email" autocapitalize="off" required></div>
+    <div class="field"><label class="lbl" for="a-pw">Contraseña</label><input id="a-pw" type="password" autocomplete="current-password" required minlength="6"></div>
+    <label class="remember" for="a-rem"><input id="a-rem" type="checkbox" checked> Recordar mi correo en este teléfono</label>
+    <div id="a-msg" role="status"></div>
+    <button class="btn eat" id="a-go" type="submit">Entrar</button>
+    <button class="linkbtn" id="a-switch" type="button">¿No tienes cuenta? Crear una</button>
+  </form>
+  <button class="btn bio" id="a-bio" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-7 7v2M19 12v-2a7 7 0 0 0-11-5.7"/><path d="M8.5 21c1-1.6 1.5-3.6 1.5-6v-4a2 2 0 0 1 4 0v4c0 1.2-.1 2.3-.4 3.4"/><path d="M5 15.5c.6-1 1-2.3 1-3.5M18.4 15.5c-.3 1.6-.8 3-1.6 4.3"/></svg><span id="a-bio-l">Entrar con biometría</span></button>
+  <p class="legal">© 2026 Jason Morales Ramírez · Todos los derechos reservados</p>
+</main>
+
+<div class="wrap" id="app" hidden>
+  <header class="top"><b>Spin Reservas</b><span class="who" id="who"></span></header>
+
+  <section id="v-clases"><div class="stack" id="clist"></div></section>
+
+  <section id="v-class" hidden>
+    <div class="stack">
+      <button class="back" id="back" type="button">‹ Clases</button>
+      <div>
+        <h2 id="c-title"></h2>
+        <div class="muted" id="c-sub"></div>
+      </div>
+      <div class="mybook" id="c-mine" hidden></div>
+      <div class="card room"><svg id="room" viewBox="0 0 360 250" role="group" aria-label="Mapa de la sala"></svg></div>
+      <div class="legend"><span><i></i>Libre</span><span><i class="t"></i>Ocupada</span><span><i class="m"></i>Tuya</span></div>
+      <div class="muted" id="c-free" style="text-align:center"></div>
+      <div class="card" id="c-roster" hidden></div>
+    </div>
+  </section>
+
+  <section id="v-mias" hidden><div class="stack" id="mlist"></div></section>
+
+  <section id="v-admin" hidden>
+    <div class="stack">
+      <form class="card stack" id="cform">
+        <h2>Nueva clase</h2>
+        <div class="field"><label class="lbl" for="n-title">Nombre</label><input id="n-title" value="Spinning" maxlength="60" required></div>
+        <div class="field"><label class="lbl" for="n-inst">Instructor (opcional)</label><input id="n-inst" maxlength="60"></div>
+        <div class="row2">
+          <div class="field"><label class="lbl" for="n-when">Fecha y hora</label><input id="n-when" type="datetime-local" required></div>
+          <div class="field"><label class="lbl" for="n-dur">Duración (min)</label><input id="n-dur" type="number" min="15" max="180" value="45" required></div>
+        </div>
+        <button class="btn eat" id="n-go" type="submit">Crear clase</button>
+      </form>
+      <div class="lbl">Clases programadas</div>
+      <div class="stack" id="alist"></div>
+    </div>
+  </section>
+
+  <section id="v-cuenta" hidden>
+    <div class="stack">
+      <form class="card stack" id="nform">
+        <h2>Mi nombre</h2>
+        <p class="muted" style="margin:0">Así te ve el instructor en la lista de la clase.</p>
+        <div class="field"><label class="lbl" for="u-name">Nombre</label><input id="u-name" maxlength="40" required></div>
+        <button class="btn eat" type="submit">Guardar</button>
+      </form>
+      <div class="card stack" id="biosec" hidden>
+        <h2 id="bio-title">Entrar con biometría</h2>
+        <div id="biolist"></div>
+        <button class="btn ghost" id="bioadd" type="button">Registrar este teléfono</button>
+      </div>
+      <button class="btn ghost" id="signout" type="button">Cerrar sesión</button>
+      <p class="legal">© 2026 Jason Morales Ramírez · Todos los derechos reservados</p>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" id="tabs" hidden>
+  <button data-v="clases" aria-selected="true">Clases</button>
+  <button data-v="mias" aria-selected="false">Mis reservas</button>
+  <button data-v="admin" aria-selected="false" id="tab-admin" hidden>Admin</button>
+  <button data-v="cuenta" aria-selected="false">Cuenta</button>
+</nav>
+
+<div class="scrim" id="scrim" hidden><div class="sheet" role="dialog" aria-modal="true">
+  <h2 id="sheet-t"></h2><p id="sheet-p"></p><div class="stack" id="sheet-a"></div>
+</div></div>
+
+<div class="scrim" id="nscrim" hidden><form class="sheet" id="nameform">
+  <h2>¿Cómo te llamas?</h2><p>Solo la persona que da la clase verá tu nombre.</p>
+  <input id="nm-in" maxlength="40" required placeholder="Nombre" autocomplete="given-name">
+  <button class="btn eat" type="submit">Continuar</button>
+</form></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+/* ---------- setup (same Supabase project and keys as Pinto & Pesas, so the same accounts work) ---------- */
+const SB_URL="https://jcsiaqyihunsacembumy.supabase.co";
+const SB_KEY="sb_publishable_taVcn0nEVO0VPU5u5KB4ig_UU3AHXEw";
+const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,experimental:{passkey:true}}});
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const S={user:null,name:"",admin:false,classes:[],res:[],names:{},current:null,tab:"clases",channel:null};
+let toastT;
+function toast(m){document.querySelectorAll(".toast").forEach(n=>n.remove());const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.append(t);clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),3200)}
+
+/* ---------- dates ---------- */
+const fDay=new Intl.DateTimeFormat("es-CR",{weekday:"long",day:"numeric",month:"long"});
+const fTime=new Intl.DateTimeFormat("es-CR",{hour:"numeric",minute:"2-digit"});
+const fWd=new Intl.DateTimeFormat("es-CR",{weekday:"short"});
+const fDn=new Intl.DateTimeFormat("es-CR",{day:"numeric",month:"short"});
+const cap1=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const started=c=>new Date(c.starts_at)<=new Date();
+
+/* ---------- room geometry: 26 bikes in 3 concentric arcs around the instructor, numbered front to back like cinema seats ---------- */
+const ROWS=[{n:6,r:62},{n:9,r:112},{n:11,r:162}],CX=180,CY=58,SPAN=80;
+const SEATS=(()=>{const out=[];let num=1;for(const row of ROWS){for(let i=0;i<row.n;i++){const a=(-SPAN+2*SPAN*i/(row.n-1))*Math.PI/180;out.push({n:num++,x:CX+row.r*Math.sin(a),y:CY+row.r*Math.cos(a)})}}return out})();
+
+/* ---------- auth (mirrors Pinto & Pesas) ---------- */
+const rememberEmail=v=>{try{v?localStorage.setItem("sp-email",v):localStorage.removeItem("sp-email")}catch(_){}};
+const rememberedEmail=()=>{try{return localStorage.getItem("sp-email")||""}catch(_){return ""}};
+let authMode="in";
+function showAuth(on){$("#auth").hidden=!on;$("#app").hidden=on;$("#tabs").hidden=on;if(on){const em=rememberedEmail();if(em&&!$("#a-email").value)$("#a-email").value=em}}
+function setAuthMode(m){authMode=m;$("#a-title").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-go").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-switch").textContent=m==="in"?"¿No tienes cuenta? Crear una":"¿Ya tienes cuenta? Entrar";$("#a-msg").textContent="";$("#a-pw").autocomplete=m==="in"?"current-password":"new-password"}
+$("#a-switch").onclick=()=>setAuthMode(authMode==="in"?"up":"in");
+$("#aform").addEventListener("submit",async e=>{e.preventDefault();
+  const email=$("#a-email").value.trim(),password=$("#a-pw").value,btn=$("#a-go"),msg=$("#a-msg");
+  if(password.length<6){msg.textContent="La contraseña necesita al menos 6 caracteres.";return}
+  btn.disabled=true;btn.textContent="Un momento…";msg.textContent="";
+  rememberEmail($("#a-rem").checked?email:"");
+  const r=authMode==="in"?await sb.auth.signInWithPassword({email,password}):await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});
+  btn.disabled=false;btn.textContent=authMode==="in"?"Entrar":"Crear cuenta";
+  if(r.error){msg.textContent=r.error.message.includes("Invalid login")?"Correo o contraseña incorrectos.":r.error.message.includes("not confirmed")?"Primero confirma tu correo con el enlace que te enviamos.":r.error.message;return}
+  if(authMode==="up"&&!r.data.session){setAuthMode("in");$("#a-msg").textContent="Te enviamos un correo para confirmar la cuenta. Ábrelo y luego entra aquí."}
+});
+$("#signout").onclick=async()=>{$("#a-msg").textContent="";await sb.auth.signOut({scope:"local"})};
+(()=>{const em=rememberedEmail();if(em){$("#a-email").value=em;$("#a-rem").checked=true}})();
+$("#a-rem").addEventListener("change",e=>{if(!e.target.checked)rememberEmail("")});
+
+/* ---------- idle sign-out after 5 minutes ---------- */
+const IDLE_MS=5*60*1000;
+const idleGet=()=>{try{return +localStorage.getItem("sp-last")||0}catch(_){return 0}};
+let idleLastWrite=0,idleOut=false;
+function idleTouch(force){const now=Date.now();if(!force&&now-idleLastWrite<15000)return;idleLastWrite=now;try{localStorage.setItem("sp-last",String(now))}catch(_){}}
+async function idleSignOut(){if(idleOut||!S.user)return;idleOut=true;try{await sb.auth.signOut({scope:"local"})}catch(_){}idleOut=false;$("#a-msg").textContent="Por seguridad se cerró la sesión tras 5 minutos sin uso."}
+function idleCheck(){if(!S.user)return;const last=idleGet();if(last&&Date.now()-last>IDLE_MS)idleSignOut()}
+["pointerdown","keydown","touchstart","scroll","input"].forEach(ev=>document.addEventListener(ev,()=>{if(S.user&&document.visibilityState==="visible")idleTouch()},{passive:true,capture:true}));
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"){if(S.user)idleTouch(true)}else{idleCheck();if(S.user)refresh()}});
+window.addEventListener("pageshow",idleCheck);window.addEventListener("focus",idleCheck);
+setInterval(()=>{if(document.visibilityState==="visible"){idleCheck();if(S.user)renderAll()}},60000);
+
+/* ---------- data ---------- */
+async function loadData(){
+  const since=new Date(Date.now()-60*60000).toISOString();
+  const c=await sb.from("spin_classes").select("*").gte("starts_at",since).order("starts_at");
+  if(c.error)throw c.error;
+  S.classes=c.data;
+  if(S.classes.length){
+    const r=await sb.from("spin_reservations").select("id,class_id,bike,user_id").in("class_id",S.classes.map(x=>x.id));
+    if(r.error)throw r.error;
+    S.res=r.data;
+  }else S.res=[];
+  if(S.admin){
+    const p=await sb.from("spin_profiles").select("user_id,display_name");
+    S.names=p.error?{}:Object.fromEntries(p.data.map(x=>[x.user_id,x.display_name]));
+  }
+}
+let refreshT;
+function refresh(){clearTimeout(refreshT);refreshT=setTimeout(async()=>{if(!S.user)return;try{await loadData();renderAll()}catch(e){console.error(e)}},250)}
+const resOf=id=>S.res.filter(r=>r.class_id===id);
+const mineOf=id=>S.res.find(r=>r.class_id===id&&r.user_id===S.user.id);
+const takenCount=c=>resOf(c.id).filter(r=>r.bike<=c.capacity).length;
+
+/* ---------- rendering ---------- */
+function showView(v){
+  S.tab=v;S.current=null;
+  ["clases","class","mias","admin","cuenta"].forEach(x=>$("#v-"+x).hidden=true);
+  $("#v-"+v).hidden=false;
+  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.v===v)));
+  renderAll();
+}
+function renderAll(){
+  $("#who").textContent=S.name||S.user?.email||"";
+  $("#tab-admin").hidden=!S.admin;
+  renderClasses();renderMine();renderAdmin();
+  if(S.current)renderClass();
+}
+function clsCard(c,opts={}){
+  const d=new Date(c.starts_at),mine=mineOf(c.id),free=c.capacity-takenCount(c),go=started(c);
+  const pill=mine?`<span class="pill mine">Bici ${mine.bike}</span>`:go?`<span class="pill off">En curso</span>`:free<=0?`<span class="pill full">Llena</span>`:`<span class="pill">${free} libres</span>`;
+  return `<button class="cls" type="button" data-cls="${esc(c.id)}"><div class="when"><b>${esc(fTime.format(d))}</b><span>${esc(cap1(fWd.format(d)))} ${esc(fDn.format(d))}</span></div><div class="info"><strong>${esc(c.title)}</strong><span>${esc(c.instructor?c.instructor+" · ":"")}${c.duration_min} min</span></div>${pill}</button>`;
+}
+function renderClasses(){
+  $("#clist").innerHTML=S.classes.length?S.classes.map(c=>clsCard(c)).join(""):`<div class="card muted">No hay clases programadas por ahora.</div>`;
+}
+function renderMine(){
+  const mine=S.classes.filter(c=>mineOf(c.id)&&!started(c));
+  $("#mlist").innerHTML=mine.length?mine.map(c=>clsCard(c)).join(""):`<div class="card muted">Todavía no tienes reservas. Elige una clase y toca tu bici.</div>`;
+}
+function renderAdmin(){
+  if(!S.admin){return}
+  $("#alist").innerHTML=S.classes.length?S.classes.map(c=>clsCard(c)).join(""):`<div class="card muted">Sin clases.</div>`;
+}
+function renderClass(){
+  const c=S.classes.find(x=>x.id===S.current);
+  if(!c){showView("clases");return}
+  const d=new Date(c.starts_at),mine=mineOf(c.id),taken=new Map(resOf(c.id).map(r=>[r.bike,r])),go=started(c);
+  $("#c-title").textContent=c.title;
+  $("#c-sub").textContent=`${cap1(fDay.format(d))} · ${fTime.format(d)} · ${c.duration_min} min${c.instructor?" · "+c.instructor:""}`;
+  const mb=$("#c-mine");mb.hidden=!mine;if(mine)mb.textContent=`Tu bici: ${mine.bike}. Toca otra bici libre para cambiarte o toca la tuya para cancelar.`;
+  let svg=`<g class="stage"><rect x="${CX-52}" y="8" width="104" height="26" rx="13"/><text x="${CX}" y="21">INSTRUCTOR</text></g>`;
+  for(const s of SEATS){
+    const r=taken.get(s.n),off=s.n>c.capacity;
+    const st=off?"off":r?(r.user_id===S.user.id?"mine":"taken"):"free";
+    const label=`Bici ${s.n}, ${st==="free"?"libre":st==="mine"?"tuya":st==="taken"?"ocupada":"no disponible"}`;
+    svg+=`<g class="seat ${st}" data-bike="${s.n}" role="button" tabindex="${st==="off"?-1:0}" aria-label="${label}"><circle r="17" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" fill="transparent"/><circle class="body" r="15" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}"/><text x="${s.x.toFixed(1)}" y="${s.y.toFixed(1)}">${s.n}</text></g>`;
+  }
+  $("#room").innerHTML=svg;
+  const free=c.capacity-takenCount(c);
+  $("#c-free").textContent=go?"La clase ya empezó. Ya no se puede reservar.":free>0?`${free} de ${c.capacity} bicis libres`:"Clase llena";
+  const ro=$("#c-roster");ro.hidden=!S.admin;
+  if(S.admin){
+    const rows=[...resOf(c.id)].sort((a,b)=>a.bike-b.bike);
+    ro.innerHTML=`<div class="lbl" style="margin-bottom:6px">Lista (${rows.length})</div>`+(rows.length?rows.map(r=>`<div class="rost"><span>Bici ${r.bike}</span><span>${esc(S.names[r.user_id]||"Sin nombre")}</span></div>`).join(""):`<div class="muted">Nadie ha reservado.</div>`)+`<button class="btn ghost" id="delcls" type="button" style="margin-top:10px;width:100%">Eliminar clase</button>`;
+  }
+}
+function openClass(id){
+  S.current=id;
+  ["clases","mias","admin","cuenta"].forEach(x=>$("#v-"+x).hidden=true);
+  $("#v-class").hidden=false;renderClass();window.scrollTo(0,0);
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-cls]");if(b)openClass(b.dataset.cls)});
+$("#back").onclick=()=>showView(S.tab==="class"?"clases":S.tab);
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>showView(b.dataset.v));
+
+/* ---------- sheet ---------- */
+function closeSheet(){$("#scrim").hidden=true}
+function sheet(title,text,actions){
+  $("#sheet-t").textContent=title;$("#sheet-p").textContent=text;
+  const box=$("#sheet-a");box.innerHTML="";
+  for(const a of actions){const b=document.createElement("button");b.type="button";b.className="btn "+(a.cls||"");b.textContent=a.label;b.onclick=async()=>{b.disabled=true;try{if(a.fn)await a.fn()}finally{closeSheet()}};box.append(b)}
+  const x=document.createElement("button");x.type="button";x.className="btn ghost";x.textContent="Cerrar";x.onclick=closeSheet;box.append(x);
+  $("#scrim").hidden=false;
+}
+$("#scrim").addEventListener("click",e=>{if(e.target.id==="scrim")closeSheet()});
+
+/* ---------- booking ---------- */
+function dbError(err){
+  const m=String(err?.message||"");
+  if(err?.code==="23505"&&m.includes("class_id, bike"))return "Esa bici se acaba de ocupar. Elige otra.";
+  if(err?.code==="23505")return "Ya tienes una reserva en esta clase.";
+  if(err?.code==="42501"||/row-level security/i.test(m))return "No se pudo: la clase ya empezó o no tienes permiso.";
+  return m||"Algo salió mal. Intenta de nuevo.";
+}
+async function book(c,bike){
+  const mine=mineOf(c.id);
+  if(mine){const d=await sb.from("spin_reservations").delete().eq("id",mine.id);if(d.error){toast(dbError(d.error));return}}
+  const r=await sb.from("spin_reservations").insert({class_id:c.id,bike});
+  if(r.error){
+    if(mine)await sb.from("spin_reservations").insert({class_id:c.id,bike:mine.bike});   // put the previous bike back
+    toast(dbError(r.error));
+  }else toast(mine?`Te cambiaste a la bici ${bike}`:`Listo: bici ${bike} reservada`);
+  await loadData();renderAll();
+}
+async function cancel(r){
+  const d=await sb.from("spin_reservations").delete().eq("id",r.id);
+  if(d.error)toast(dbError(d.error));else toast("Reserva cancelada");
+  await loadData();renderAll();
+}
+function seatAction(el){
+  const c=S.classes.find(x=>x.id===S.current);if(!c||!el)return;
+  const bike=+el.dataset.bike,r=resOf(c.id).find(x=>x.bike===bike),when=`${cap1(fDay.format(new Date(c.starts_at)))}, ${fTime.format(new Date(c.starts_at))}`;
+  if(el.classList.contains("off"))return;
+  if(started(c)&&!S.admin){toast("La clase ya empezó");return}
+  if(r&&r.user_id===S.user.id)return sheet(`Bici ${bike}`,`Es tu reserva de ${when}.`,[{label:"Cancelar mi reserva",cls:"burn",fn:()=>cancel(r)}]);
+  if(r){
+    if(S.admin)return sheet(`Bici ${bike}`,`Reservada por ${S.names[r.user_id]||"alguien sin nombre"}.`,[{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}]);
+    toast("Esa bici ya está ocupada");return;
+  }
+  const mine=mineOf(c.id);
+  sheet(mine?`Cambiar a la bici ${bike}`:`Reservar la bici ${bike}`,mine?`Dejarás la bici ${mine.bike}. ${when}.`:`${c.title} · ${when}.`,[{label:mine?"Cambiarme":"Reservar",cls:"eat big",fn:()=>book(c,bike)}]);
+}
+$("#room").addEventListener("click",e=>seatAction(e.target.closest(".seat")));
+$("#room").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){const s=e.target.closest(".seat");if(s){e.preventDefault();seatAction(s)}}});
+
+/* ---------- admin ---------- */
+$("#cform").addEventListener("submit",async e=>{e.preventDefault();
+  const btn=$("#n-go"),when=$("#n-when").value;if(!when)return;
+  btn.disabled=true;
+  const r=await sb.from("spin_classes").insert({title:$("#n-title").value.trim()||"Spinning",instructor:$("#n-inst").value.trim()||null,starts_at:new Date(when).toISOString(),duration_min:+$("#n-dur").value||45});
+  btn.disabled=false;
+  if(r.error){toast(dbError(r.error));return}
+  toast("Clase creada");$("#n-when").value="";await loadData();renderAll();
+});
+document.addEventListener("click",e=>{
+  if(!e.target.closest("#delcls"))return;
+  const c=S.classes.find(x=>x.id===S.current);if(!c)return;
+  sheet("¿Eliminar la clase?","Se borrarán también todas sus reservas. No se puede deshacer.",[{label:"Eliminar clase",cls:"burn",fn:async()=>{
+    const d=await sb.from("spin_classes").delete().eq("id",c.id);
+    if(d.error){toast(dbError(d.error));return}
+    toast("Clase eliminada");await loadData();showView("admin");
+  }}]);
+});
+
+/* ---------- profile name ---------- */
+async function loadProfile(){
+  const p=await sb.from("spin_profiles").select("display_name").eq("user_id",S.user.id).maybeSingle();
+  S.name=p.data?.display_name||"";
+  $("#u-name").value=S.name;
+  $("#nscrim").hidden=!!S.name;
+  if(!S.name)setTimeout(()=>$("#nm-in").focus(),50);
+}
+async function saveName(v){
+  const name=v.trim();if(!name)return false;
+  const r=await sb.from("spin_profiles").upsert({user_id:S.user.id,display_name:name});
+  if(r.error){toast(r.error.message);return false}
+  S.name=name;$("#u-name").value=name;$("#nscrim").hidden=true;renderAll();return true;
+}
+$("#nameform").addEventListener("submit",async e=>{e.preventDefault();await saveName($("#nm-in").value)});
+$("#nform").addEventListener("submit",async e=>{e.preventDefault();if(await saveName($("#u-name").value))toast("Nombre guardado")});
+
+/* ---------- session ---------- */
+async function startSession(user){
+  if(S.user&&S.user.id===user.id)return;
+  S.user=user;showAuth(false);
+  try{
+    const a=await sb.from("spin_admins").select("user_id").eq("user_id",user.id).maybeSingle();
+    S.admin=!!a.data;
+    await loadProfile();
+    await loadData();
+  }catch(e){toast("No se pudo cargar. Revisa tu conexión.");console.error(e)}
+  $("#tabs").hidden=false;showView("clases");
+  if(S.channel)sb.removeChannel(S.channel);
+  S.channel=sb.channel("spin").on("postgres_changes",{event:"*",schema:"public",table:"spin_reservations"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_classes"},refresh).subscribe();
+}
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(session?.user&&ev==="INITIAL_SESSION"){
+    const last=idleGet();
+    if(last&&Date.now()-last>IDLE_MS){S.user={id:session.user.id};setTimeout(idleSignOut,0);return}
+  }
+  if(session?.user&&ev==="SIGNED_IN")idleTouch(true);
+  if(session?.user)setTimeout(()=>startSession(session.user),0);
+  else{
+    if(S.channel){sb.removeChannel(S.channel);S.channel=null}
+    S.user=null;S.admin=false;S.name="";S.classes=[];S.res=[];S.current=null;closeSheet();$("#nscrim").hidden=true;showAuth(true);
+  }
+});
+
+/* ---------- biometric sign-in (Supabase passkeys), same flow as Pinto & Pesas ---------- */
+const ua=navigator.userAgent;
+const isIOS=/iphone|ipad|ipod/i.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const bioSupported=!!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext);
+const bioName=isIOS?"Face ID / Touch ID":"huella o rostro";
+const bioLocal={get:()=>{try{return localStorage.getItem("sp-bio")==="1"}catch(_){return false}},set:v=>{try{v?localStorage.setItem("sp-bio","1"):localStorage.removeItem("sp-bio")}catch(_){}}};
+function bioError(err){
+  const m=String(err?.message||err||""),c=err?.code||"";
+  if(err?.name==="NotAllowedError"||/NotAllowed|cancel|abort|timed out/i.test(m))return "";
+  if(c==="passkey_disabled"||/passkey.*disabled|not enabled/i.test(m))return "La biometría todavía no está activada en el servidor.";
+  if(c==="too_many_passkeys")return "Llegaste al máximo de dispositivos. Quita uno en Cuenta.";
+  if(/InvalidStateError|already registered|excludeCredentials/i.test(m))return "Este teléfono ya está registrado.";
+  if(c==="webauthn_verification_failed")return "No se pudo verificar. Intenta de nuevo.";
+  return m||"No se pudo completar. Intenta de nuevo.";
+}
+function bioUI(){
+  $("#a-bio").hidden=!bioSupported;$("#a-bio-l").textContent=`Entrar con ${bioName}`;$("#a-bio").classList.toggle("eat",bioLocal.get());
+  $("#biosec").hidden=!bioSupported;$("#bio-title").textContent=`Entrar con ${bioName}`;
+}
+async function bioList(){
+  if(!bioSupported||!S.user)return;
+  const {data,error}=await sb.auth.passkey.list();
+  if(error){$("#biolist").innerHTML="";return}
+  const list=Array.isArray(data)?data:(data?.passkeys||[]);
+  if(!list.length&&bioLocal.get())bioLocal.set(false);
+  $("#biolist").innerHTML=list.length?list.map(p=>`<div class="pk"><div>${esc(p.friendly_name||"Dispositivo")}</div><button class="btn ghost" style="padding:6px 10px;font-size:.8rem" data-pkdel="${esc(p.id)}" type="button">Quitar</button></div>`).join(""):`<div class="muted" style="font-size:.85rem">Ningún teléfono registrado todavía.</div>`;
+}
+$("#bioadd").onclick=async e=>{
+  const btn=e.currentTarget,label=btn.textContent;btn.disabled=true;btn.textContent="Esperando…";
+  try{const {error}=await sb.auth.registerPasskey();if(error)throw error;bioLocal.set(true);toast(`Listo. La próxima vez entra con ${bioName}`);bioList()}
+  catch(err){const m=bioError(err);if(m)toast(m)}
+  finally{btn.disabled=false;btn.textContent=label}
+};
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-pkdel]");if(!b)return;
+  b.disabled=true;
+  const {error}=await sb.auth.passkey.delete({passkeyId:b.dataset.pkdel});
+  if(error){b.disabled=false;toast(bioError(error)||"No se pudo quitar");return}
+  toast("Dispositivo quitado");bioList();
+});
+$("#a-bio").onclick=async e=>{
+  const btn=e.currentTarget,msg=$("#a-msg"),l=$("#a-bio-l"),prev=l.textContent;
+  btn.disabled=true;l.textContent="Esperando…";msg.textContent="";
+  try{const {error}=await sb.auth.signInWithPasskey();if(error)throw error;bioLocal.set(true)}
+  catch(err){const m=bioError(err);msg.textContent=m?m:(bioLocal.get()?"":`Si es tu primera vez, entra con correo y contraseña y activa ${bioName} en Cuenta.`)}
+  finally{btn.disabled=false;l.textContent=prev}
+};
+document.querySelector('#tabs [data-v="cuenta"]').addEventListener("click",bioList);
+
+/* ---------- boot ---------- */
+setAuthMode("in");bioUI();
+console.log("%cSpin Reservas","font-weight:900;font-size:16px","\n© 2026 Jason Morales Ramírez. Todos los derechos reservados.");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+</script>
+</body>
+</html>
