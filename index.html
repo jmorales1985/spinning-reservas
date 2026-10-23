@@ -473,8 +473,8 @@ sb.auth.onAuthStateChange((ev,session)=>{
 /* ---------- biometric sign-in (Supabase passkeys), same flow as Pinto & Pesas ---------- */
 const ua=navigator.userAgent;
 const isIOS=/iphone|ipad|ipod/i.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-// Passkeys are disabled until they are configured for this Supabase project and domain; set to the commented expression to re-enable.
-const bioSupported=false; // !!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext)
+// Passkeys need Authentication > Passkeys enabled in the Supabase project (RP ID = this site's domain).
+const bioSupported=!!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext);
 const bioName=isIOS?"Face ID / Touch ID":"huella o rostro";
 const bioLocal={get:()=>{try{return localStorage.getItem("sp-bio")==="1"}catch(_){return false}},set:v=>{try{v?localStorage.setItem("sp-bio","1"):localStorage.removeItem("sp-bio")}catch(_){}}};
 function bioError(err){
