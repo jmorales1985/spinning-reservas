@@ -151,8 +151,11 @@ section>.stack{gap:12px}
 .seat.blocked text{fill:var(--muted)}
 .legend i.b{background:var(--paper);border:2px dashed var(--muted)}
 .bgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-.bb{border:1px solid var(--eat);background:var(--card);border-radius:10px;padding:9px 0;font-weight:800;font-size:.9rem}
-.bb[aria-pressed="true"]{background:var(--paper);border:1.5px dashed var(--muted);color:var(--muted);text-decoration:line-through}
+.bb{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 0;font-weight:800;font-size:.9rem}
+.bb[aria-pressed="true"]{background:var(--eat);border-color:var(--eat);color:#fff}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.segb{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 0;font-weight:700}
+.segb[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
 .kbd{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-weight:600;background:var(--paper);white-space:nowrap}
 </style>
@@ -222,10 +225,19 @@ section>.stack{gap:12px}
         <div class="muted" id="n-sum" style="font-size:.85rem" role="status"></div>
         <button class="btn eat" id="n-go" type="submit">Crear clase</button>
       </form>
-      <div class="lbl">Bicis bloqueadas</div>
+      <div class="lbl">Bicis apartadas</div>
       <div class="card stack">
-        <div class="muted" style="font-size:.85rem" id="bhelp">Una bici bloqueada no se puede reservar en ninguna clase. Toca una bici para bloquearla o desbloquearla. Las reservas que ya existan se respetan.</div>
-        <div class="bgrid" id="bblocks"></div>
+        <div class="muted" style="font-size:.85rem" id="hhelp"></div>
+        <form id="hform" class="stack">
+          <div class="seg" role="group" aria-label="Tipo"><button type="button" class="segb" data-htype="block" aria-pressed="true">Bloquear bici</button><button type="button" class="segb" data-htype="fixed" aria-pressed="false">Reserva fija</button></div>
+          <div class="field"><span class="lbl" id="h-bikes-l">Bici(s)</span><div class="bgrid" id="hbikes"></div></div>
+          <div class="field" id="h-who" hidden><label class="lbl" for="h-email">Correo de la persona</label><input id="h-email" type="email" inputmode="email" autocapitalize="off"></div>
+          <div class="row2"><div class="field"><label class="lbl" for="h-from">Desde</label><input id="h-from" type="date" required></div><div class="field"><label class="lbl" for="h-to">Hasta (opcional)</label><input id="h-to" type="date"></div></div>
+          <div class="field"><span class="lbl">Solo estos días (vacío = todos)</span><div class="days" id="h-days"></div></div>
+          <div class="field"><label class="lbl" for="h-note">Nota (opcional)</label><input id="h-note" maxlength="60" placeholder="Ej: en reparación"></div>
+          <button class="btn eat" id="h-go" type="submit">Bloquear</button>
+        </form>
+        <div id="hlist"></div>
       </div>
       <div class="lbl">Administradores</div>
       <div class="card stack">
@@ -294,7 +306,7 @@ const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefr
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const S={user:null,name:"",admin:false,classes:[],res:[],names:{},roster:null,admins:null,blocked:null,cal:{month:null,sel:null},current:null,tab:"clases",channel:null};
+const S={user:null,name:"",admin:false,classes:[],res:[],names:{},roster:null,admins:null,holds:null,holdInfo:{},cal:{month:null,sel:null},current:null,tab:"clases",channel:null};
 let toastT;
 function toast(m){document.querySelectorAll(".toast").forEach(n=>n.remove());const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.append(t);clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),3200)}
 
@@ -350,25 +362,32 @@ async function loadData(){
   if(c.error)throw c.error;
   S.classes=c.data;
   if(S.classes.length){
-    const r=await sb.from("spin_reservations").select("id,class_id,bike,user_id").in("class_id",S.classes.map(x=>x.id));
+    const ids=S.classes.map(x=>x.id);
+    let r=await sb.from("spin_reservations").select("id,class_id,bike,user_id,hold_id").in("class_id",ids);
+    if(r.error)r=await sb.from("spin_reservations").select("id,class_id,bike,user_id").in("class_id",ids);   // before supabase/holds.sql has been run
     if(r.error)throw r.error;
     S.res=r.data;
   }else S.res=[];
-  // Fixed bike blocks (null until supabase/blocked_bikes.sql has been run)
-  const bl=await sb.from("spin_blocked_bikes").select("bike");S.blocked=bl.error?null:bl.data;
+  // Bikes set aside for a period: blocks (everyone can read) and fixed reservations (admins only). null until supabase/holds.sql has been run.
+  const hl=await sb.from("spin_holds").select("id,bike,user_id,starts_on,ends_on,weekdays,note");S.holds=hl.error?null:hl.data;
   if(S.admin){
     const p=await sb.from("spin_profiles").select("user_id,display_name");
     S.names=p.error?{}:Object.fromEntries(p.data.map(x=>[x.user_id,x.display_name]));
     // Admin-only RPCs (names + emails, admin list). They fail until supabase/admin_and_roster.sql has been run; the UI falls back gracefully.
     const ro=await sb.rpc("spin_roster");S.roster=ro.error?null:ro.data;
     const ad=await sb.rpc("spin_list_admins");S.admins=ad.error?null:ad.data;
+    if(S.holds!==null){const hi=await sb.rpc("spin_list_holds");S.holdInfo=hi.error?{}:Object.fromEntries(hi.data.map(x=>[x.id,x]))}
   }
 }
 let refreshT;
 function refresh(){clearTimeout(refreshT);refreshT=setTimeout(async()=>{if(!S.user)return;try{await loadData();renderAll()}catch(e){console.error(e)}},250)}
 function whoIs(uid){const x=(S.roster||[]).find(r=>r.user_id===uid);return{name:x?.display_name||S.names[uid]||"Sin nombre",email:x?.email||""}}
-const blockedSet=()=>new Set((S.blocked||[]).map(b=>b.bike));
-function freeCount(c){const t=new Set(resOf(c.id).map(r=>r.bike)),bl=blockedSet();let n=0;for(let i=1;i<=c.capacity;i++)if(!t.has(i)&&!bl.has(i))n++;return n}
+// A hold covers a class when the class date (Costa Rica time) is inside the period and on one of the chosen weekdays
+const CR_TZ="America/Costa_Rica";
+function crParts(iso){const s=new Date(iso).toLocaleDateString("en-CA",{timeZone:CR_TZ}),[y,m,d]=s.split("-").map(Number);return{date:s,dow:new Date(y,m-1,d).getDay()}}
+const holdCovers=(h,p)=>p.date>=h.starts_on&&(!h.ends_on||p.date<=h.ends_on)&&(!h.weekdays||h.weekdays.includes(p.dow));
+const blockOf=(c,bike,p=crParts(c.starts_at))=>(S.holds||[]).find(h=>!h.user_id&&h.bike===bike&&holdCovers(h,p));
+function freeCount(c){const t=new Set(resOf(c.id).map(r=>r.bike)),p=crParts(c.starts_at);let n=0;for(let i=1;i<=c.capacity;i++)if(!t.has(i)&&!blockOf(c,i,p))n++;return n}
 const resOf=id=>S.res.filter(r=>r.class_id===id);
 const mineOf=id=>S.res.find(r=>r.class_id===id&&r.user_id===S.user.id);
 const takenCount=c=>resOf(c.id).filter(r=>r.bike<=c.capacity).length;
@@ -429,23 +448,21 @@ function renderMine(){
 }
 function renderAdmin(){
   if(!S.admin){return}
-  const bset=blockedSet();
-  $("#bblocks").innerHTML=S.blocked===null?"":Array.from({length:26},(_,i)=>i+1).map(n=>`<button type="button" class="bb" data-block="${n}" aria-pressed="${bset.has(n)}" aria-label="Bici ${n}, ${bset.has(n)?"bloqueada":"disponible"}">${n}</button>`).join("");
-  $("#bhelp").textContent=S.blocked===null?"Esta función todavía no está activada en la base de datos.":"Una bici bloqueada no se puede reservar en ninguna clase. Toca una bici para bloquearla o desbloquearla. Las reservas que ya existan se respetan.";
+  renderHolds();
   $("#admlist").innerHTML=S.admins===null?`<div class="muted">Esta función todavía no está activada en la base de datos.</div>`:S.admins.map(a=>`<div class="rost" style="align-items:center"><span>${esc(a.display_name||"Sin nombre")}<br><span class="muted" style="font-size:.78rem">${esc(a.email||"")}</span></span>${a.user_id===S.user.id?`<span class="pill">Tú</span>`:`<button class="btn ghost" style="padding:6px 10px;font-size:.8rem" data-rmadm="${esc(a.user_id)}" type="button">Quitar</button>`}</div>`).join("");
   $("#alist").innerHTML=S.classes.length?S.classes.map(c=>clsCard(c)).join(""):`<div class="card muted">Sin clases.</div>`;
 }
 function renderClass(){
   const c=S.classes.find(x=>x.id===S.current);
   if(!c){showView("clases");return}
-  const d=new Date(c.starts_at),mine=mineOf(c.id),taken=new Map(resOf(c.id).map(r=>[r.bike,r])),go=started(c),blk=blockedSet();
+  const d=new Date(c.starts_at),mine=mineOf(c.id),taken=new Map(resOf(c.id).map(r=>[r.bike,r])),go=started(c),cp=crParts(c.starts_at);
   $("#c-title").textContent=c.title;
   $("#c-sub").textContent=`${cap1(fDay.format(d))} · ${fTime.format(d)} · ${c.duration_min} min${c.instructor?" · "+c.instructor:""}`;
-  const mb=$("#c-mine");mb.hidden=!mine;if(mine)mb.textContent=`Tu bici: ${mine.bike}. Toca otra bici libre para cambiarte o toca la tuya para cancelar.`;
+  const mb=$("#c-mine");mb.hidden=!mine;if(mine)mb.textContent=`Tu bici: ${mine.bike}${mine.hold_id?" (fija)":""}. Toca otra bici libre para cambiarte o toca la tuya para cancelar.`;
   let svg=`<g class="stage"><rect x="${CX-52}" y="8" width="104" height="26" rx="13"/><text x="${CX}" y="21">INSTRUCTOR</text></g>`;
   for(const s of SEATS){
     const r=taken.get(s.n),off=s.n>c.capacity;
-    const st=off?"off":r?(r.user_id===S.user.id?"mine":"taken"):blk.has(s.n)?"blocked":"free";
+    const st=off?"off":r?(r.user_id===S.user.id?"mine":"taken"):blockOf(c,s.n,cp)?"blocked":"free";
     const label=`Bici ${s.n}, ${st==="free"?"libre":st==="mine"?"tuya":st==="taken"?"ocupada":st==="blocked"?"bloqueada":"no disponible"}`;
     svg+=`<g class="seat ${st}" data-bike="${s.n}" role="button" tabindex="${st==="off"?-1:0}" aria-label="${label}"><circle r="17" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" fill="transparent"/><circle class="body" r="15" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}"/><text x="${s.x.toFixed(1)}" y="${s.y.toFixed(1)}">${s.n}</text></g>`;
   }
@@ -455,7 +472,7 @@ function renderClass(){
   const ro=$("#c-roster");ro.hidden=!S.admin;
   if(S.admin){
     const rows=[...resOf(c.id)].sort((a,b)=>a.bike-b.bike);
-    ro.innerHTML=`<div class="lbl" style="margin-bottom:6px">Lista (${rows.length})</div>`+(rows.length?rows.map(r=>{const w=whoIs(r.user_id);return `<div class="rost"><span>Bici ${r.bike}</span><span style="text-align:right">${esc(w.name)}${w.email?`<br><span class="muted" style="font-size:.78rem">${esc(w.email)}</span>`:""}</span></div>`}).join(""):`<div class="muted">Nadie ha reservado.</div>`)+`<button class="btn ghost" id="delcls" type="button" style="margin-top:10px;width:100%">Eliminar clase</button>`;
+    ro.innerHTML=`<div class="lbl" style="margin-bottom:6px">Lista (${rows.length})</div>`+(rows.length?rows.map(r=>{const w=whoIs(r.user_id);return `<div class="rost"><span>Bici ${r.bike}${r.hold_id?` <span class="pill">Fija</span>`:""}</span><span style="text-align:right">${esc(w.name)}${w.email?`<br><span class="muted" style="font-size:.78rem">${esc(w.email)}</span>`:""}</span></div>`}).join(""):`<div class="muted">Nadie ha reservado.</div>`)+`<button class="btn ghost" id="delcls" type="button" style="margin-top:10px;width:100%">Eliminar clase</button>`;
   }
 }
 function openClass(id){
@@ -506,18 +523,18 @@ function seatAction(el){
   const bike=+el.dataset.bike,r=resOf(c.id).find(x=>x.bike===bike),when=`${cap1(fDay.format(new Date(c.starts_at)))}, ${fTime.format(new Date(c.starts_at))}`;
   if(el.classList.contains("off"))return;
   if(el.classList.contains("blocked")){
-    if(S.admin&&S.blocked!==null)return sheet(`Bici ${bike} bloqueada`,"No se puede reservar en ninguna clase.",[{label:"Quitar el bloqueo",cls:"eat",fn:()=>setBlock(bike,false)}]);
-    toast("Esa bici no está disponible");return;
+    const bh=blockOf(c,bike);
+    if(S.admin&&bh)return sheet(`Bici ${bike} bloqueada`,`${holdText(bh)}${bh.note?" · "+bh.note:""}. Quitar el bloqueo lo elimina para todas esas clases.`,[{label:"Quitar el bloqueo",cls:"eat",fn:()=>removeHold(bh.id)}]);
+    toast(bh?.note?`Bici no disponible: ${bh.note}`:"Esa bici no está disponible");return;
   }
   if(started(c)&&!S.admin){toast("La clase ya empezó");return}
-  if(r&&r.user_id===S.user.id)return sheet(`Bici ${bike}`,`Es tu reserva de ${when}.`,[{label:"Cancelar mi reserva",cls:"burn",fn:()=>cancel(r)}]);
+  if(r&&r.user_id===S.user.id)return sheet(`Bici ${bike}`,`Es tu reserva${r.hold_id?" fija":""} de ${when}.${r.hold_id?" Si la cancelas, solo se libera esta clase.":""}`,[{label:"Cancelar mi reserva",cls:"burn",fn:()=>cancel(r)}]);
   if(r){
     if(S.admin)return sheet(`Bici ${bike}`,`Reservada por ${whoIs(r.user_id).name}${whoIs(r.user_id).email?" ("+whoIs(r.user_id).email+")":""}.`,[{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}]);
     toast("Esa bici ya está ocupada");return;
   }
   const mine=mineOf(c.id);
   const acts=[{label:mine?"Cambiarme":"Reservar",cls:"eat big",fn:()=>book(c,bike)}];
-  if(S.admin&&S.blocked!==null)acts.push({label:"Bloquear esta bici en todas las clases",cls:"ghost",fn:()=>setBlock(bike,true)});
   sheet(mine?`Cambiar a la bici ${bike}`:`Reservar la bici ${bike}`,mine?`Dejarás la bici ${mine.bike}. ${when}.`:`${c.title} · ${when}.`,acts);
 }
 $("#room").addEventListener("click",e=>seatAction(e.target.closest(".seat")));
@@ -526,7 +543,7 @@ $("#room").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){const
 /* ---------- admin: create classes (single or weekly recurring) ---------- */
 const DAYN=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"],MAX_CLASSES=100;
 $("#n-days").innerHTML=[1,2,3,4,5,6,0].map(d=>`<button type="button" class="dbtn" data-d="${d}" aria-pressed="false">${DAYN[d]}</button>`).join("");
-const pickedDays=()=>[...document.querySelectorAll("#n-days [aria-pressed=true]")].map(b=>+b.dataset.d);
+const pickedDays=(root="#n-days")=>[...document.querySelectorAll(root+" [aria-pressed=true]")].map(b=>+b.dataset.d);
 const pad2=n=>String(n).padStart(2,"0");
 const dateInput=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 // Start date/time = first possible class; repeats on the picked weekdays at the same time until the end date (inclusive)
@@ -598,18 +615,76 @@ document.addEventListener("click",e=>{
   }}]);
 });
 
-async function setBlock(bike,on){
-  const r=on?await sb.from("spin_blocked_bikes").insert({bike}):await sb.from("spin_blocked_bikes").delete().eq("bike",bike);
-  if(r.error){toast(r.error.code==="23505"?"Esa bici ya estaba bloqueada":r.error.code==="42501"?"No tienes permiso para esto":dbError(r.error));return}
-  toast(on?`Bici ${bike} bloqueada`:`Bici ${bike} desbloqueada`);await loadData();renderAll();
+/* ---------- admin: bikes set aside for a period (blocks and fixed reservations) ---------- */
+const H={type:"block",bikes:new Set()};
+const fHoldDay=new Intl.DateTimeFormat("es-CR",{day:"numeric",month:"short",year:"numeric"});
+const hdate=s=>{const [y,m,d]=s.split("-").map(Number);return fHoldDay.format(new Date(y,m-1,d))};
+function holdText(h){
+  const per=h.ends_on?`${hdate(h.starts_on)} – ${hdate(h.ends_on)}`:`desde ${hdate(h.starts_on)}`;
+  return per+(h.weekdays?" · "+[1,2,3,4,5,6,0].filter(d=>h.weekdays.includes(d)).map(d=>DAYN[d]).join(", "):" · todos los días");
+}
+$("#h-days").innerHTML=$("#n-days").innerHTML;
+$("#h-days").addEventListener("click",e=>{const b=e.target.closest(".dbtn");if(b)b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true"))});
+function renderHoldPicker(){
+  $("#hbikes").innerHTML=Array.from({length:26},(_,i)=>i+1).map(n=>`<button type="button" class="bb" data-hbike="${n}" aria-pressed="${H.bikes.has(n)}" aria-label="Bici ${n}">${n}</button>`).join("");
+  document.querySelectorAll("[data-htype]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.htype===H.type)));
+  $("#h-who").hidden=H.type!=="fixed";
+  $("#h-bikes-l").textContent=H.type==="fixed"?"Bici (una)":"Bici(s)";
+  $("#h-go").textContent=H.type==="fixed"?"Reservar fija":"Bloquear";
+}
+function renderHolds(){
+  const off=S.holds===null;
+  $("#hhelp").textContent=off?"Esta función todavía no está activada en la base de datos.":"Bloquear: nadie puede reservar esas bicis en el periodo. Reserva fija: la bici queda a nombre de una persona en cada clase del periodo (también en las clases que crees después).";
+  $("#hform").hidden=off;
+  if(off){$("#hlist").innerHTML="";return}
+  renderHoldPicker();
+  const today=crParts(new Date().toISOString()).date;
+  const act=S.holds.filter(h=>!h.ends_on||h.ends_on>=today).sort((a,b)=>a.starts_on.localeCompare(b.starts_on)||a.bike-b.bike);
+  $("#hlist").innerHTML=act.length?`<div class="lbl" style="margin:6px 0 2px">Vigentes y próximos</div>`+act.map(h=>{
+    const i=S.holdInfo[h.id]||{};
+    return `<div class="rost" style="align-items:center;gap:10px"><span><b>Bici ${h.bike}</b> · ${h.user_id?"fija":"bloqueada"}<br><span class="muted" style="font-size:.78rem">${esc(holdText(h))}</span>${h.user_id?`<br><span style="font-size:.85rem">${esc(i.display_name||"Sin nombre")}</span> <span class="muted" style="font-size:.78rem">${esc(i.email||"")}</span>`:""}${h.note?`<br><span class="muted" style="font-size:.78rem">${esc(h.note)}</span>`:""}</span><button class="btn ghost" style="padding:6px 10px;font-size:.8rem;flex:none" data-rmhold="${esc(h.id)}" type="button">Quitar</button></div>`;
+  }).join(""):`<div class="muted" style="font-size:.85rem">No hay bicis apartadas.</div>`;
+}
+async function removeHold(id){
+  const r=await sb.rpc("spin_remove_hold",{p_hold:id});
+  if(r.error||r.data!=="ok"){toast(r.error?dbError(r.error):"No se pudo quitar");return}
+  toast("Listo, quitado");await loadData();renderAll();
 }
 document.addEventListener("click",e=>{
-  const b=e.target.closest("[data-block]");if(!b)return;
-  const n=+b.dataset.block,isOn=blockedSet().has(n);
-  if(isOn)return sheet(`Desbloquear la bici ${n}`,"Volverá a poder reservarse en todas las clases.",[{label:"Desbloquear",cls:"eat",fn:()=>setBlock(n,false)}]);
-  const future=S.res.filter(r=>r.bike===n&&S.classes.some(c=>c.id===r.class_id&&!started(c))).length;
-  sheet(`Bloquear la bici ${n}`,`No se podrá reservar en ninguna clase.${future?` Hay ${future} reserva${future>1?"s":""} futura${future>1?"s":""} en esta bici; se respetan.`:""}`,[{label:"Bloquear",cls:"burn",fn:()=>setBlock(n,true)}]);
+  const t=e.target.closest("[data-htype]");
+  if(t){H.type=t.dataset.htype;if(H.type==="fixed"&&H.bikes.size>1)H.bikes=new Set([[...H.bikes][0]]);renderHoldPicker();return}
+  const b=e.target.closest("[data-hbike]");
+  if(b){const n=+b.dataset.hbike;if(H.type==="fixed")H.bikes=H.bikes.has(n)?new Set():new Set([n]);else if(!H.bikes.delete(n))H.bikes.add(n);renderHoldPicker();return}
+  const rm=e.target.closest("[data-rmhold]");
+  if(rm){
+    const h=(S.holds||[]).find(x=>x.id===rm.dataset.rmhold);if(!h)return;
+    sheet(h.user_id?"¿Quitar la reserva fija?":"¿Quitar el bloqueo?",h.user_id?"Se cancelan sus reservas en las clases de este periodo que aún no empiezan. Las pasadas quedan en el historial.":"La bici volverá a poder reservarse en las clases de este periodo.",[{label:"Quitar",cls:"burn",fn:()=>removeHold(h.id)}]);
+  }
 });
+$("#hform").addEventListener("submit",async e=>{e.preventDefault();
+  const btn=$("#h-go"),bikes=[...H.bikes].sort((a,b)=>a-b),fixed=H.type==="fixed";
+  if(!bikes.length){toast("Elige al menos una bici");return}
+  const from=$("#h-from").value,to=$("#h-to").value||null;
+  if(!from){toast("Elige la fecha de inicio");return}
+  if(to&&to<from){toast("La fecha final es antes de la inicial");return}
+  const email=fixed?$("#h-email").value.trim():null;
+  if(fixed&&!email){toast("Escribe el correo de la persona");return}
+  const days=pickedDays("#h-days"),note=$("#h-note").value.trim()||null;
+  btn.disabled=true;let made=0,kept=0,left=0;
+  for(const bike of bikes){
+    const r=await sb.rpc("spin_add_hold",{p_bike:bike,p_email:email,p_from:from,p_to:to,p_days:days.length?days:null,p_note:note});
+    if(r.error){btn.disabled=false;toast(dbError(r.error));await loadData();renderAll();return}
+    if(r.data==="not_found"){btn.disabled=false;toast("No encontré una cuenta confirmada con ese correo");return}
+    const [,created,other]=String(r.data).split("|");made++;kept+=+created;left+=+other;
+  }
+  btn.disabled=false;
+  const pl=(n,s,p)=>`${n} ${n===1?s:p}`;
+  toast(fixed?`Reserva fija lista: ${pl(kept,"clase asignada","clases asignadas")}${left?`, ${left} sin poder asignar (bici o persona ya ocupada)`:""}`:`${made===1?"Bici bloqueada":made+" bicis bloqueadas"}${left?`. ${pl(left,"reserva existente se respeta","reservas existentes se respetan")}`:""}`);
+  H.bikes=new Set();$("#h-note").value="";$("#h-email").value="";
+  await loadData();renderAll();
+});
+$("#h-from").value=crParts(new Date().toISOString()).date;
+renderHoldPicker();
 
 /* ---------- profile name ---------- */
 async function loadProfile(){
@@ -640,7 +715,7 @@ async function startSession(user){
   }catch(e){toast("No se pudo cargar. Revisa tu conexión.");console.error(e)}
   $("#tabs").hidden=false;showView("clases");
   if(S.channel)sb.removeChannel(S.channel);
-  S.channel=sb.channel("spin").on("postgres_changes",{event:"*",schema:"public",table:"spin_reservations"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_classes"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_blocked_bikes"},refresh).subscribe();
+  S.channel=sb.channel("spin").on("postgres_changes",{event:"*",schema:"public",table:"spin_reservations"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_classes"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_holds"},refresh).subscribe();
 }
 sb.auth.onAuthStateChange((ev,session)=>{
   if(session?.user&&ev==="INITIAL_SESSION"){
