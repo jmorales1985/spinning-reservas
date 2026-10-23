@@ -232,7 +232,7 @@ section>.stack{gap:12px}
           <div class="seg" role="group" aria-label="Tipo"><button type="button" class="segb" data-htype="block" aria-pressed="true">Bloquear bici</button><button type="button" class="segb" data-htype="fixed" aria-pressed="false">Reserva fija</button></div>
           <div class="field"><span class="lbl" id="h-bikes-l">Bici(s)</span><div class="bgrid" id="hbikes"></div></div>
           <div class="field" id="h-who" hidden><label class="lbl" for="h-email">Correo de la persona</label><input id="h-email" type="email" inputmode="email" autocapitalize="off"></div>
-          <div class="row2"><div class="field"><label class="lbl" for="h-from">Desde</label><input id="h-from" type="date" required></div><div class="field"><label class="lbl" for="h-to">Hasta (opcional)</label><input id="h-to" type="date"></div></div>
+          <div class="row2"><div class="field"><label class="lbl" for="h-from">Desde</label><input id="h-from" type="date" required></div><div class="field"><label class="lbl" for="h-to">Hasta (vacío = sin fecha final)</label><input id="h-to" type="date"></div></div>
           <div class="field"><span class="lbl">Solo estos días (vacío = todos)</span><div class="days" id="h-days"></div></div>
           <div class="field"><label class="lbl" for="h-note">Nota (opcional)</label><input id="h-note" maxlength="60" placeholder="Ej: en reparación"></div>
           <button class="btn eat" id="h-go" type="submit">Bloquear</button>
@@ -530,11 +530,12 @@ function seatAction(el){
   if(started(c)&&!S.admin){toast("La clase ya empezó");return}
   if(r&&r.user_id===S.user.id)return sheet(`Bici ${bike}`,`Es tu reserva${r.hold_id?" fija":""} de ${when}.${r.hold_id?" Si la cancelas, solo se libera esta clase.":""}`,[{label:"Cancelar mi reserva",cls:"burn",fn:()=>cancel(r)}]);
   if(r){
-    if(S.admin)return sheet(`Bici ${bike}`,`Reservada por ${whoIs(r.user_id).name}${whoIs(r.user_id).email?" ("+whoIs(r.user_id).email+")":""}.`,[{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}]);
+    if(S.admin){const a=[{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}];if(S.holds!==null)a.push({label:"Bloquear esta bici de esta clase en adelante",cls:"ghost",fn:()=>quickBlock(c,bike)});return sheet(`Bici ${bike}`,`Reservada por ${whoIs(r.user_id).name}${whoIs(r.user_id).email?" ("+whoIs(r.user_id).email+")":""}.`,a)}
     toast("Esa bici ya está ocupada");return;
   }
   const mine=mineOf(c.id);
   const acts=[{label:mine?"Cambiarme":"Reservar",cls:"eat big",fn:()=>book(c,bike)}];
+  if(S.admin&&S.holds!==null)acts.push({label:"Bloquear esta bici de esta clase en adelante",cls:"ghost",fn:()=>quickBlock(c,bike)});
   sheet(mine?`Cambiar a la bici ${bike}`:`Reservar la bici ${bike}`,mine?`Dejarás la bici ${mine.bike}. ${when}.`:`${c.title} · ${when}.`,acts);
 }
 $("#room").addEventListener("click",e=>seatAction(e.target.closest(".seat")));
@@ -634,7 +635,7 @@ function renderHoldPicker(){
 }
 function renderHolds(){
   const off=S.holds===null;
-  $("#hhelp").textContent=off?"Esta función todavía no está activada en la base de datos.":"Bloquear: nadie puede reservar esas bicis en el periodo. Reserva fija: la bici queda a nombre de una persona en cada clase del periodo (también en las clases que crees después).";
+  $("#hhelp").textContent=off?"Falta activar esta función: ejecuta el archivo supabase/holds.sql en el SQL Editor de Supabase (proyecto spinning-reservas).":"Bloquear: nadie puede reservar esas bicis en el periodo (sin fecha final = de ahí en adelante, en todas las clases). Reserva fija: la bici queda a nombre de una persona en cada clase del periodo (también en las clases que crees después).";
   $("#hform").hidden=off;
   if(off){$("#hlist").innerHTML="";return}
   renderHoldPicker();
@@ -644,6 +645,14 @@ function renderHolds(){
     const i=S.holdInfo[h.id]||{};
     return `<div class="rost" style="align-items:center;gap:10px"><span><b>Bici ${h.bike}</b> · ${h.user_id?"fija":"bloqueada"}<br><span class="muted" style="font-size:.78rem">${esc(holdText(h))}</span>${h.user_id?`<br><span style="font-size:.85rem">${esc(i.display_name||"Sin nombre")}</span> <span class="muted" style="font-size:.78rem">${esc(i.email||"")}</span>`:""}${h.note?`<br><span class="muted" style="font-size:.78rem">${esc(h.note)}</span>`:""}</span><button class="btn ghost" style="padding:6px 10px;font-size:.8rem;flex:none" data-rmhold="${esc(h.id)}" type="button">Quitar</button></div>`;
   }).join(""):`<div class="muted" style="font-size:.85rem">No hay bicis apartadas.</div>`;
+}
+// Block a bike from this class' date onward, in every class, with no end date
+async function quickBlock(c,bike){
+  const r=await sb.rpc("spin_add_hold",{p_bike:bike,p_email:null,p_from:crParts(c.starts_at).date,p_to:null,p_days:null,p_note:null});
+  if(r.error||r.data==="not_found"){toast(r.error?dbError(r.error):"No se pudo bloquear");return}
+  const kept=+String(r.data).split("|")[2]||0;
+  toast(`Bici ${bike} bloqueada de esta clase en adelante${kept?`. ${kept} reserva${kept===1?" existente se respeta":"s existentes se respetan"}`:""}`);
+  await loadData();renderAll();
 }
 async function removeHold(id){
   const r=await sb.rpc("spin_remove_hold",{p_hold:id});
