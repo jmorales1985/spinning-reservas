@@ -1,5 +1,4 @@
--- Applied to project pinto-pesas (jcsiaqyihunsacembumy) as migration spin_booking_schema.
--- Tables are prefixed spin_ so they sit next to Pinto & Pesas without touching it.
+-- Applied to its own Supabase project spinning-reservas (nsbixmqkrwcbmgskivol) as migration spin_booking_schema.
 -- spin_admins(user_id)                      who can create/delete classes and see names
 -- spin_profiles(user_id, display_name)      own row, or admin reads all
 -- spin_classes(id, title, instructor, starts_at, duration_min, capacity<=26)   readable by signed-in users

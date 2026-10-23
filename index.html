@@ -217,9 +217,9 @@ section>.stack{gap:12px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
 "use strict";
-/* ---------- setup (same Supabase project and keys as Pinto & Pesas, so the same accounts work) ---------- */
-const SB_URL="https://jcsiaqyihunsacembumy.supabase.co";
-const SB_KEY="sb_publishable_taVcn0nEVO0VPU5u5KB4ig_UU3AHXEw";
+/* ---------- setup (own Supabase project: spinning-reservas) ---------- */
+const SB_URL="https://nsbixmqkrwcbmgskivol.supabase.co";
+const SB_KEY="sb_publishable_7UycRVk1M1X4GmxSBmjy_g_VHcD3IF1";
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,experimental:{passkey:true}}});
 
 const $=s=>document.querySelector(s);
@@ -473,7 +473,8 @@ sb.auth.onAuthStateChange((ev,session)=>{
 /* ---------- biometric sign-in (Supabase passkeys), same flow as Pinto & Pesas ---------- */
 const ua=navigator.userAgent;
 const isIOS=/iphone|ipad|ipod/i.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-const bioSupported=!!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext);
+// Passkeys are disabled until they are configured for this Supabase project and domain; set to the commented expression to re-enable.
+const bioSupported=false; // !!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext)
 const bioName=isIOS?"Face ID / Touch ID":"huella o rostro";
 const bioLocal={get:()=>{try{return localStorage.getItem("sp-bio")==="1"}catch(_){return false}},set:v=>{try{v?localStorage.setItem("sp-bio","1"):localStorage.removeItem("sp-bio")}catch(_){}}};
 function bioError(err){
