@@ -119,6 +119,17 @@ section>.stack{gap:12px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .rost{display:flex;justify-content:space-between;gap:8px;font-size:.88rem;padding:4px 0;border-bottom:1px dashed var(--line)}
 .pk{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.85rem;padding:6px 0}
+
+/* install prompt */
+.install{display:flex;align-items:center;gap:12px;background:var(--ink);color:var(--paper);border-radius:14px;padding:12px 14px}
+.install .ic{width:40px;height:40px;border-radius:10px;flex:none;display:block}
+.install .t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.install .t b{font-weight:700}
+.install .t span{font-size:.8rem;opacity:.75}
+.install .btn{background:var(--eat);color:#fff;padding:9px 14px;flex:none}
+.install .x{background:none;border:0;color:var(--paper);opacity:.6;font-size:1.3rem;line-height:1;padding:4px 6px;flex:none}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
+.kbd{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-weight:600;background:var(--paper);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -142,7 +153,15 @@ section>.stack{gap:12px}
 <div class="wrap" id="app" hidden>
   <header class="top"><b>Spin Reservas</b><span class="who" id="who"></span></header>
 
-  <section id="v-clases"><div class="stack" id="clist"></div></section>
+  <section id="v-clases"><div class="stack">
+    <div class="install" id="installbar" hidden>
+      <img class="ic" src="/icon-192.png" alt="" width="40" height="40">
+      <div class="t"><b>Instala Spin Reservas</b><span>Reserva más rápido, desde tu pantalla de inicio</span></div>
+      <button class="btn" id="installgo" type="button">Instalar</button>
+      <button class="x" id="installno" type="button" aria-label="Ahora no">×</button>
+    </div>
+    <div class="stack" id="clist"></div>
+  </div></section>
 
   <section id="v-class" hidden>
     <div class="stack">
@@ -191,6 +210,7 @@ section>.stack{gap:12px}
         <div id="biolist"></div>
         <button class="btn ghost" id="bioadd" type="button">Registrar este teléfono</button>
       </div>
+      <button class="btn eat" id="installsettings" type="button" hidden>Instalar la app en mi teléfono</button>
       <button class="btn ghost" id="signout" type="button">Cerrar sesión</button>
       <p class="legal">© 2026 Jason Morales Ramírez · Todos los derechos reservados</p>
     </div>
@@ -206,6 +226,12 @@ section>.stack{gap:12px}
 
 <div class="scrim" id="scrim" hidden><div class="sheet" role="dialog" aria-modal="true">
   <h2 id="sheet-t"></h2><p id="sheet-p"></p><div class="stack" id="sheet-a"></div>
+</div></div>
+
+<div class="scrim" id="iscrim" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="it">
+  <h2 id="it">Instalar Spin Reservas</h2>
+  <ol class="steps" id="isteps"></ol>
+  <button class="btn eat" id="iclose" type="button">Entendido</button>
 </div></div>
 
 <div class="scrim" id="nscrim" hidden><form class="sheet" id="nameform">
@@ -383,7 +409,7 @@ async function book(c,bike){
   if(r.error){
     if(mine)await sb.from("spin_reservations").insert({class_id:c.id,bike:mine.bike});   // put the previous bike back
     toast(dbError(r.error));
-  }else toast(mine?`Te cambiaste a la bici ${bike}`:`Listo: bici ${bike} reservada`);
+  }else{toast(mine?`Te cambiaste a la bici ${bike}`:`Listo: bici ${bike} reservada`);if(!mine)nudgeInstall()}
   await loadData();renderAll();
 }
 async function cancel(r){
@@ -520,8 +546,43 @@ $("#a-bio").onclick=async e=>{
 };
 document.querySelector('#tabs [data-v="cuenta"]').addEventListener("click",bioList);
 
+/* ---------- install to home screen ---------- */
+let deferredPrompt=null,nudged=false;
+const isStandalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const isIOSSafari=isIOS&&!/crios|fxios|edgios/i.test(ua);
+// "Not now" only hides the banner for 2 days; the Cuenta button is always there
+function installSnoozed(){try{return Date.now()-(+localStorage.getItem("sp-install-no")||0)<2*864e5}catch(_){return false}}
+function updateInstallUI(){
+  const can=!isStandalone();
+  $("#installsettings").hidden=!can;
+  $("#installbar").hidden=!can||installSnoozed();
+}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallUI()});
+window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallUI();toast("Listo, ya está en tu pantalla de inicio")});
+const SHARE_ICON='<svg width="14" height="16" viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V1M3.5 4.5 7 1l3.5 3.5"/><path d="M4 7H2v10h10V7h-2"/></svg>';
+function showInstallSteps(){
+  let steps;
+  if(isIOS&&isIOSSafari)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> en la barra de Safari (abajo, o arriba en iPad).`,`Baja en la lista y toca <span class="kbd">Agregar a inicio</span>.`,`Toca <span class="kbd">Agregar</span>. El ícono de Spin Reservas aparece en tu pantalla de inicio.`];
+  else if(isIOS)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> de tu navegador.`,`Elige <span class="kbd">Agregar a inicio</span>. Si no aparece, abre esta página en Safari y hazlo desde ahí.`,`Toca <span class="kbd">Agregar</span>.`];
+  else steps=[`Abre el menú del navegador <span class="kbd">⋮</span>.`,`Toca <span class="kbd">Instalar app</span> o <span class="kbd">Agregar a pantalla principal</span>.`,`Confirma. El ícono aparece junto a tus otras apps.`];
+  $("#isteps").innerHTML=steps.map(s=>`<li>${s}</li>`).join("");$("#iscrim").hidden=false;$("#iclose").focus();
+}
+async function doInstall(){
+  if(deferredPrompt){deferredPrompt.prompt();const r=await deferredPrompt.userChoice.catch(()=>null);deferredPrompt=null;updateInstallUI();if(r&&r.outcome==="accepted")return;return}
+  showInstallSteps();
+}
+// After a first successful booking, once per visit, suggest installing (the best moment: they just saw the value)
+function nudgeInstall(){
+  if(nudged||isStandalone())return;nudged=true;
+  setTimeout(()=>sheet("Instala la app","Tendrás Spin Reservas en tu pantalla de inicio para reservar tu bici en segundos.",[{label:"Instalar",cls:"eat big",fn:doInstall}]),900);
+}
+$("#installgo").onclick=doInstall;$("#installsettings").onclick=doInstall;
+$("#installno").onclick=()=>{try{localStorage.setItem("sp-install-no",String(Date.now()))}catch(_){}updateInstallUI();toast("Puedes instalarla luego desde Cuenta")};
+$("#iclose").onclick=()=>$("#iscrim").hidden=true;
+$("#iscrim").addEventListener("click",e=>{if(e.target.id==="iscrim")$("#iscrim").hidden=true});
+
 /* ---------- boot ---------- */
-setAuthMode("in");bioUI();
+setAuthMode("in");bioUI();updateInstallUI();
 console.log("%cSpin Reservas","font-weight:900;font-size:16px","\n© 2026 Jason Morales Ramírez. Todos los derechos reservados.");
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
 </script>
