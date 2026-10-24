@@ -805,8 +805,8 @@ window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallUI(
 const SHARE_ICON='<svg width="14" height="16" viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V1M3.5 4.5 7 1l3.5 3.5"/><path d="M4 7H2v10h10V7h-2"/></svg>';
 function showInstallSteps(){
   let steps;
-  if(isIOS&&isIOSSafari)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> en la barra de Safari (abajo, o arriba en iPad).`,`Baja en la lista y toca <span class="kbd">Agregar a inicio</span>.`,`Toca <span class="kbd">Agregar</span>. El ícono de Spin Reservas aparece en tu pantalla de inicio.`];
-  else if(isIOS)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> de tu navegador.`,`Elige <span class="kbd">Agregar a inicio</span>. Si no aparece, abre esta página en Safari y hazlo desde ahí.`,`Toca <span class="kbd">Agregar</span>.`];
+  if(isIOS&&isIOSSafari)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> en la barra de Safari (abajo, o arriba en iPad).`,`Baja en la lista y toca <span class="kbd">Agregar a pantalla de inicio</span> (en algunos iPhone dice «Añadir a pantalla de inicio»).`,`Toca <span class="kbd">Agregar</span>. El ícono de Spin Reservas aparece en tu pantalla de inicio.`];
+  else if(isIOS)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> de tu navegador.`,`Elige <span class="kbd">Agregar a pantalla de inicio</span> (en algunos iPhone dice «Añadir a pantalla de inicio»). Si no aparece, abre esta página en Safari y hazlo desde ahí.`,`Toca <span class="kbd">Agregar</span>.`];
   else steps=[`Abre el menú del navegador <span class="kbd">⋮</span>.`,`Toca <span class="kbd">Instalar app</span> o <span class="kbd">Agregar a pantalla principal</span>.`,`Confirma. El ícono aparece junto a tus otras apps.`];
   $("#isteps").innerHTML=steps.map(s=>`<li>${s}</li>`).join("");$("#iscrim").hidden=false;$("#iclose").focus();
 }
