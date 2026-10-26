@@ -233,7 +233,7 @@ section>.stack{gap:12px}
         <form id="hform" class="stack">
           <div class="seg" role="group" aria-label="Tipo"><button type="button" class="segb" data-htype="block" aria-pressed="true">Bloquear bici</button><button type="button" class="segb" data-htype="fixed" aria-pressed="false">Reserva fija</button></div>
           <div class="field"><span class="lbl" id="h-bikes-l">Bici(s)</span><div class="bgrid" id="hbikes"></div></div>
-          <div class="field" id="h-who" hidden><label class="lbl" for="h-email">Correo de la persona</label><input id="h-email" type="email" inputmode="email" autocapitalize="off"></div>
+          <div class="field" id="h-who" hidden><label class="lbl" for="h-email">Correo de la persona</label><input id="h-email" type="email" inputmode="email" autocapitalize="off" autocomplete="off" list="h-users" placeholder="Escribe para buscar o elige de la lista"><datalist id="h-users"></datalist></div>
           <div class="row2"><div class="field"><label class="lbl" for="h-from">Desde</label><input id="h-from" type="date" required></div><div class="field"><label class="lbl" for="h-to">Hasta (vacío = sin fecha final)</label><input id="h-to" type="date"></div></div>
           <div class="field"><span class="lbl">Solo estos días (vacío = todos)</span><div class="days" id="h-days"></div></div>
           <div class="field"><label class="lbl" for="h-note">Nota (opcional)</label><input id="h-note" maxlength="60" placeholder="Ej: en reparación"></div>
@@ -377,6 +377,8 @@ async function loadData(){
     S.names=p.error?{}:Object.fromEntries(p.data.map(x=>[x.user_id,x.display_name]));
     // Admin-only RPCs (names + emails, admin list). They fail until supabase/admin_and_roster.sql has been run; the UI falls back gracefully.
     const ro=await sb.rpc("spin_roster");S.roster=ro.error?null:ro.data;
+    const us=await sb.rpc("spin_list_users");S.users=us.error?null:us.data;   // registered clients, for the fixed-reservation picker (supabase/list_users.sql)
+    $("#h-users").innerHTML=(S.users||[]).map(u=>`<option value="${esc(u.email)}">${esc(u.display_name||"")}</option>`).join("");
     const ad=await sb.rpc("spin_list_admins");S.admins=ad.error?null:ad.data;
     if(S.holds!==null){const hi=await sb.rpc("spin_list_holds");S.holdInfo=hi.error?{}:Object.fromEntries(hi.data.map(x=>[x.id,x]))}
   }
