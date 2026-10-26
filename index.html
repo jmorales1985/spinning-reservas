@@ -143,6 +143,8 @@ section>.stack{gap:12px}
 .cal-g button.sel{background:var(--ink);color:var(--paper)}
 .cal-g button.today:not(.sel){box-shadow:inset 0 0 0 2px var(--eat)}
 .cal-g button:disabled{opacity:.3}
+.cal-g button.later:not(.sel){opacity:.5}
+.cal-note{font-size:.8rem;color:var(--muted);margin-top:8px;text-align:center}
 .cal-g button i{position:absolute;bottom:5px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--eat)}
 .cal-g button i.mine{background:var(--burn)}
 .cal-g button.sel i{background:var(--paper)}
@@ -388,6 +390,9 @@ function crParts(iso){const s=new Date(iso).toLocaleDateString("en-CA",{timeZone
 const holdCovers=(h,p)=>p.date>=h.starts_on&&(!h.ends_on||p.date<=h.ends_on)&&(!h.weekdays||h.weekdays.includes(p.dow));
 const blockOf=(c,bike,p=crParts(c.starts_at))=>(S.holds||[]).find(h=>!h.user_id&&h.bike===bike&&holdCovers(h,p));
 function freeCount(c){const t=new Set(resOf(c.id).map(r=>r.bike)),p=crParts(c.starts_at);let n=0;for(let i=1;i<=c.capacity;i++)if(!t.has(i)&&!blockOf(c,i,p))n++;return n}
+// Clients can book this week and next (Mon-Sun, Costa Rica time); admins can book any week
+function windowEnd(){const[y,m,d]=crParts(new Date().toISOString()).date.split("-").map(Number),t=new Date(y,m-1,d);t.setDate(t.getDate()-((t.getDay()+6)%7)+14);return dkey(t)}
+const tooFar=c=>!S.admin&&crParts(c.starts_at).date>=windowEnd();
 const resOf=id=>S.res.filter(r=>r.class_id===id);
 const mineOf=id=>S.res.find(r=>r.class_id===id&&r.user_id===S.user.id);
 const takenCount=c=>resOf(c.id).filter(r=>r.bike<=c.capacity).length;
@@ -425,11 +430,11 @@ function renderClasses(){
   let cells="<span></span>".repeat(offset);
   for(let d=1;d<=dim;d++){
     const dt=new Date(y,mo,d),k=dkey(dt),n=(by[k]||[]).length,past=k<todayK;
-    const cls=[n?"has":"",k===S.cal.sel?"sel":"",k===todayK?"today":""].filter(Boolean).join(" ");
+    const cls=[n?"has":"",!S.admin&&k>=windowEnd()?"later":"",k===S.cal.sel?"sel":"",k===todayK?"today":""].filter(Boolean).join(" ");
     cells+=`<button type="button" class="${cls}" data-day="${k}"${past?" disabled":""} aria-pressed="${k===S.cal.sel}" aria-label="${esc(fDay.format(dt))}, ${n?n+(n===1?" clase":" clases"):"sin clases"}">${d}${n?`<i class="${mineDays.has(k)?"mine":""}"></i>`:""}</button>`;
   }
   const atCurrent=y===now.getFullYear()&&mo===now.getMonth();
-  $("#cal").innerHTML=`<div class="cal-h"><button type="button" data-nav="-1" aria-label="Mes anterior"${atCurrent?" disabled":""}>‹</button><b>${esc(cap1(fMonth.format(first)))}</b><button type="button" data-nav="1" aria-label="Mes siguiente">›</button></div><div class="cal-w">${["L","M","X","J","V","S","D"].map(x=>`<span>${x}</span>`).join("")}</div><div class="cal-g">${cells}</div>`;
+  $("#cal").innerHTML=`<div class="cal-h"><button type="button" data-nav="-1" aria-label="Mes anterior"${atCurrent?" disabled":""}>‹</button><b>${esc(cap1(fMonth.format(first)))}</b><button type="button" data-nav="1" aria-label="Mes siguiente">›</button></div><div class="cal-w">${["L","M","X","J","V","S","D"].map(x=>`<span>${x}</span>`).join("")}</div><div class="cal-g">${cells}</div>${S.admin?"":`<p class="cal-note">Puedes reservar esta semana y la siguiente (hasta el ${esc(fDn.format(keyToDate(dkey(new Date(keyToDate(windowEnd()).getTime()-864e5)))))}).</p>`}`;
   const sel=keyToDate(S.cal.sel),list=by[S.cal.sel]||[];
   $("#cal-day").textContent=cap1(fDay.format(sel));
   if(list.length){$("#clist").innerHTML=list.map(c=>clsCard(c)).join("");return}
@@ -528,6 +533,7 @@ function seatAction(el){
     toast(bh?.note?`Bici no disponible: ${bh.note}`:"Esa bici no está disponible");return;
   }
   if(started(c)&&!S.admin){toast("La clase ya empezó");return}
+  if(tooFar(c)&&!(r&&r.user_id===S.user.id)){toast("Las reservas de esa semana abren más adelante");return}
   if(r&&r.user_id===S.user.id)return sheet(`Bici ${bike}`,`Es tu reserva${r.hold_id?" fija":""} de ${when}.${r.hold_id?" Si la cancelas, solo se libera esta clase.":""}`,[{label:"Cancelar mi reserva",cls:"burn",fn:()=>cancel(r)}]);
   if(r){
     if(S.admin){const a=[{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}];if(S.holds!==null)a.push({label:"Bloquear esta bici de esta clase en adelante",cls:"ghost",fn:()=>quickBlock(c,bike)});return sheet(`Bici ${bike}`,`Reservada por ${whoIs(r.user_id).name}${whoIs(r.user_id).email?" ("+whoIs(r.user_id).email+")":""}.`,a)}
