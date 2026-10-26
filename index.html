@@ -143,6 +143,9 @@ section>.stack{gap:12px}
 .cal-g button.sel{background:var(--ink);color:var(--paper)}
 .cal-g button.today:not(.sel){box-shadow:inset 0 0 0 2px var(--eat)}
 .cal-g button:disabled{opacity:.3}
+.welcome{position:fixed;inset:0;z-index:5;background:#0a0a0d;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+.welcome img{flex:1;min-height:0;max-width:100%;object-fit:contain;border-radius:14px}
+.welcome .btn{width:100%;max-width:420px;background:#D6247F;border-color:#D6247F;color:#fff}
 .payopts{display:grid;gap:10px;text-align:left}
 .payopt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1.5px solid rgba(0,0,0,.15);border-radius:14px;cursor:pointer}
 .payopt:has(input:checked){border-color:var(--eat);background:var(--eat-soft)}
@@ -170,6 +173,10 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
 </head>
 <body>
 
+<main class="welcome" id="welcome" hidden>
+  <img src="banner.jpg" alt="RPM Cycling: clases de lunes, miércoles y viernes. Mañanas de 7:30 a 8:30 a. m. y noches de 7:15 a 8:15 p. m. Costo de la clase: ₡2.000. Información al 6290-9375. El Cerro de Sabanilla.">
+  <button class="btn eat big" id="w-next" type="button">Siguiente</button>
+</main>
 <main class="auth" id="auth" hidden>
   <h1>Spin<br>Reservas</h1>
   <div class="tag">Elige tu bici en la sala de spinning.</div>
@@ -334,7 +341,8 @@ const SEATS=(()=>{const out=[];let num=1;for(const row of ROWS){for(let i=0;i<ro
 const rememberEmail=v=>{try{v?localStorage.setItem("sp-email",v):localStorage.removeItem("sp-email")}catch(_){}};
 const rememberedEmail=()=>{try{return localStorage.getItem("sp-email")||""}catch(_){return ""}};
 let authMode="in";
-function showAuth(on){$("#auth").hidden=!on;$("#app").hidden=on;$("#tabs").hidden=on;if(on){const em=rememberedEmail();if(em&&!$("#a-email").value)$("#a-email").value=em}}
+let welcomed=false;   // the banner shows once per app open, before the login form
+function showAuth(on){$("#welcome").hidden=!(on&&!welcomed);$("#auth").hidden=!on||!welcomed;$("#app").hidden=on;$("#tabs").hidden=on;if(on&&welcomed){const em=rememberedEmail();if(em&&!$("#a-email").value)$("#a-email").value=em}}
 function setAuthMode(m){authMode=m;$("#a-title").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-go").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-switch").textContent=m==="in"?"¿No tienes cuenta? Crear una":"¿Ya tienes cuenta? Entrar";$("#a-msg").textContent="";$("#a-pw").autocomplete=m==="in"?"current-password":"new-password"}
 $("#a-switch").onclick=()=>setAuthMode(authMode==="in"?"up":"in");
 $("#aform").addEventListener("submit",async e=>{e.preventDefault();
@@ -359,6 +367,7 @@ function idleTouch(force){const now=Date.now();if(!force&&now-idleLastWrite<1500
 async function idleSignOut(){if(idleOut||!S.user)return;idleOut=true;try{await sb.auth.signOut({scope:"local"})}catch(_){}idleOut=false;$("#a-msg").textContent="Por seguridad se cerró la sesión tras 5 minutos sin uso."}
 function idleCheck(){if(!S.user)return;const last=idleGet();if(last&&Date.now()-last>IDLE_MS)idleSignOut()}
 ["pointerdown","keydown","touchstart","scroll","input"].forEach(ev=>document.addEventListener(ev,()=>{if(S.user&&document.visibilityState==="visible")idleTouch()},{passive:true,capture:true}));
+$("#w-next").onclick=()=>{welcomed=true;showAuth(true);$("#a-email").focus?.()};
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"){if(S.user)idleTouch(true)}else{idleCheck();if(S.user)refresh()}});
 window.addEventListener("pageshow",idleCheck);window.addEventListener("focus",idleCheck);
 setInterval(()=>{if(document.visibilityState==="visible"){idleCheck();if(S.user)renderAll()}},60000);
@@ -545,6 +554,7 @@ async function cancel(r){
   await loadData();renderAll();
 }
 /* ---------- payment: SIMPE proof or pay at the studio ---------- */
+const CLASS_PRICE="₡2.000";
 const SIMPE_INFO="";   // e.g. "SIMPE Móvil al 8888-8888 a nombre de RPM Spinning" (shown when someone picks SIMPE)
 const payOf=r=>S.pay?.get(r.id)||null;
 function payLabel(r){const p=payOf(r);if(!p)return"Sin forma de pago";if(p.paid)return"Pagado ✓";return p.method==="simpe"?"SIMPE (comprobante por revisar)":"Paga en el lugar"}
@@ -560,7 +570,7 @@ async function shrink(file){   // resize the proof photo to keep uploads small
 }
 function paySheet(title,text,confirmLabel,onPay){
   const box=document.createElement("div");box.className="payopts";
-  box.innerHTML=`<div class="lbl">¿Cómo vas a pagar?</div>
+  box.innerHTML=`<div class="lbl">¿Cómo vas a pagar? · Costo de la clase: ${CLASS_PRICE}</div>
   <label class="payopt"><input type="radio" name="pm" value="local"><span><b>Pagar en el lugar</b><small>Pagas al llegar a la clase.</small></span></label>
   <label class="payopt"><input type="radio" name="pm" value="simpe"><span><b>SIMPE Móvil</b><small>Sube la foto del comprobante.</small></span></label>
   <div class="pm-simpe" hidden>${SIMPE_INFO?`<p class="muted">${esc(SIMPE_INFO)}</p>`:""}<label class="btn ghost" style="display:block;text-align:center">Elegir imagen del comprobante<input class="pm-file" type="file" accept="image/*" hidden></label><div class="pm-name muted"></div></div>
