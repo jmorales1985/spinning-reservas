@@ -505,7 +505,7 @@ function renderClass(){
   const ro=$("#c-roster");ro.hidden=!S.admin;
   if(S.admin){
     const rows=[...resOf(c.id)].sort((a,b)=>a.bike-b.bike);
-    ro.innerHTML=`<div class="lbl" style="margin-bottom:6px">Lista (${rows.length})</div>`+(rows.length?rows.map(r=>{const w=whoIs(r.user_id);return `<div class="rost"${S.pay?` data-res="${r.id}" role="button" tabindex="0"`:""}><span>Bici ${r.bike}${r.hold_id?` <span class="pill">Fija</span>`:""}</span><span style="text-align:right">${esc(w.name)}${w.email?`<br><span class="muted" style="font-size:.78rem">${esc(w.email)}</span>`:""}${S.pay?`<br><span class="muted" style="font-size:.78rem">${esc(payLabel(r))}</span>`:""}</span></div>`}).join(""):`<div class="muted">Nadie ha reservado.</div>`)+`<button class="btn ghost" id="delcls" type="button" style="margin-top:10px;width:100%">Eliminar clase</button>`;
+    ro.innerHTML=`<div class="lbl" style="margin-bottom:6px">Lista (${rows.length})</div>`+(rows.length?rows.map(r=>{const w=whoIs(r.user_id);return `<div class="rost"${S.pay?` data-res="${r.id}" role="button" tabindex="0"`:""}><span>Bici ${r.bike}${r.hold_id?` <span class="pill">Fija</span>`:""}</span><span style="text-align:right">${esc(w.name)}${w.email?`<br><span class="muted" style="font-size:.78rem">${esc(w.email)}</span>`:""}${S.pay?`<br><span class="muted" style="font-size:.78rem">${esc(payLabel(r))}</span>`:""}</span></div>`}).join(""):`<div class="muted">Nadie ha reservado.</div>`)+`<button class="btn eat" id="editcls" type="button" style="margin-top:10px;width:100%">Editar clase</button><button class="btn ghost" id="delcls" type="button" style="margin-top:8px;width:100%">Eliminar clase</button>`;
   }
 }
 function openClass(id){
@@ -702,7 +702,32 @@ $("#cform").addEventListener("submit",async e=>{e.preventDefault();
   $("#n-when").value="";$("#n-until").value="";document.querySelectorAll("#n-days .dbtn").forEach(b=>b.setAttribute("aria-pressed","false"));
   updateSummary();await loadData();renderAll();
 });
+/* ---------- admin: edit a class ---------- */
+function editClassSheet(c){
+  const maxBike=Math.max(0,...resOf(c.id).map(r=>r.bike));   // capacity cannot drop below the highest booked bike
+  const parts=new Date(c.starts_at).toLocaleString("en-CA",{timeZone:CR_TZ,hour12:false}).split(", ");   // "YYYY-MM-DD, HH:MM:SS"
+  const when=`${parts[0]}T${parts[1].slice(0,5).replace(/^24/,"00")}`;
+  const box=document.createElement("form");box.className="payopts";
+  box.innerHTML=`<div class="field"><label class="lbl">Nombre</label><input class="e-title" maxlength="60" required value="${esc(c.title)}"></div>
+  <div class="field"><label class="lbl">Instructor (opcional)</label><input class="e-inst" maxlength="60" value="${esc(c.instructor||"")}"></div>
+  <div class="field"><label class="lbl">Fecha y hora</label><input class="e-when" type="datetime-local" required value="${when}"></div>
+  <div class="row2" style="grid-template-columns:1fr 1fr"><div class="field"><label class="lbl">Duración (min)</label><input class="e-dur" type="number" min="15" max="180" required value="${c.duration_min}"></div>
+  <div class="field"><label class="lbl">Bicis</label><input class="e-cap" type="number" min="${Math.max(1,maxBike)}" max="26" required value="${c.capacity}"></div></div>
+  <button class="btn eat big" type="submit">Guardar cambios</button>`;
+  const q=x=>box.querySelector(x);
+  box.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const btn=q("button");btn.disabled=true;
+    const d=new Date(q(".e-when").value);
+    if(isNaN(d)){toast("Revisa la fecha y la hora");btn.disabled=false;return}
+    const r=await sb.from("spin_classes").update({title:q(".e-title").value.trim()||"Spinning",instructor:q(".e-inst").value.trim()||null,starts_at:d.toISOString(),duration_min:+q(".e-dur").value||45,capacity:+q(".e-cap").value}).eq("id",c.id);
+    if(r.error){toast(dbError(r.error));btn.disabled=false;return}
+    closeSheet();toast("Clase actualizada");await loadData();renderAll();
+  });
+  sheet("Editar clase",resOf(c.id).length?(resOf(c.id).length===1?"La reserva se conserva.":`Las ${resOf(c.id).length} reservas se conservan.`):"Cambia lo que necesites.",[],box);
+}
 document.addEventListener("click",e=>{
+  if(e.target.closest("#editcls")){const c=S.classes.find(x=>x.id===S.current);if(c)editClassSheet(c);return}
   if(!e.target.closest("#delcls"))return;
   const c=S.classes.find(x=>x.id===S.current);if(!c)return;
   sheet("¿Eliminar la clase?","Se borrarán también todas sus reservas. No se puede deshacer.",[{label:"Eliminar clase",cls:"burn",fn:async()=>{
