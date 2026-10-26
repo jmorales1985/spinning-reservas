@@ -167,6 +167,12 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .segb{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 0;font-weight:700}
 .segb[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.sharehint{position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;align-items:center;gap:0;background:var(--eat);color:#fff;padding:8px 14px 2px;border-radius:14px;font-size:.85rem;animation:hintbob 1s ease-in-out infinite;pointer-events:none}
+#iscrim.hint .sheet{padding-bottom:calc(86px + env(safe-area-inset-bottom))!important}
+@keyframes hintbob{50%{transform:translate(-50%,6px)}}
+@media (prefers-reduced-motion:reduce){.sharehint{animation:none}}
+.inapp{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;max-width:420px;background:#2a2a33;color:#fff;border-radius:12px;padding:10px 12px;font-size:.85rem}
+.inapp button{border:0;border-radius:8px;background:#D6247F;color:#fff;font-weight:700;padding:8px 12px}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
 .kbd{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-weight:600;background:var(--paper);white-space:nowrap}
 </style>
@@ -175,6 +181,7 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
 
 <main class="welcome" id="welcome" hidden>
   <img src="banner.jpg" alt="RPM Cycling: clases de lunes, miércoles y viernes. Mañanas de 7:30 a 8:30 a. m. y noches de 7:15 a 8:15 p. m. Costo de la clase: ₡2.000. Información al 6290-9375. El Cerro de Sabanilla.">
+  <div class="inapp" id="inapp" hidden><span>Para instalar la app, ábrela en Safari.</span><button id="inapp-copy" type="button">Copiar enlace</button></div>
   <button class="btn eat big" id="w-next" type="button">Siguiente</button>
 </main>
 <main class="auth" id="auth" hidden>
@@ -299,10 +306,12 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
   <h2 id="sheet-t"></h2><p id="sheet-p"></p><div class="stack" id="sheet-a"></div>
 </div></div>
 
+<div class="sharehint" id="sharehint" hidden aria-hidden="true"><b>Toca Compartir</b><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15M6 13l6 6 6-6"/></svg></div>
 <div class="scrim" id="iscrim" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="it">
   <h2 id="it">Instalar Spin Reservas</h2>
   <ol class="steps" id="isteps"></ol>
-  <button class="btn eat" id="iclose" type="button">Entendido</button>
+  <button class="btn eat" id="icopy" type="button" hidden>Copiar enlace</button>
+  <button class="btn ghost" id="iclose" type="button">Entendido</button>
 </div></div>
 
 <div class="scrim" id="nscrim" hidden><form class="sheet" id="nameform">
@@ -898,7 +907,13 @@ document.querySelector('#tabs [data-v="cuenta"]').addEventListener("click",bioLi
 /* ---------- install to home screen ---------- */
 let deferredPrompt=null,nudged=false;
 const isStandalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
-const isIOSSafari=isIOS&&!/crios|fxios|edgios/i.test(ua);
+const isInApp=isIOS&&!isStandalone()&&!/safari/i.test(ua);   // WhatsApp, Instagram, Facebook... open links in a webview that cannot install apps
+const isIOSSafari=isIOS&&!isInApp&&!/crios|fxios|edgios/i.test(ua);
+async function copyLink(){
+  const url=location.origin+"/";
+  try{await navigator.clipboard.writeText(url)}catch(_){const t=document.createElement("textarea");t.value=url;document.body.append(t);t.select();try{document.execCommand("copy")}catch(_){}t.remove()}
+  toast("Enlace copiado. Abre Safari y pégalo en la barra de direcciones.");
+}
 // "Not now" only hides the banner for 2 days; the Cuenta button is always there
 function installSnoozed(){try{return Date.now()-(+localStorage.getItem("sp-install-no")||0)<2*864e5}catch(_){return false}}
 function updateInstallUI(){
@@ -912,9 +927,12 @@ const SHARE_ICON='<svg width="14" height="16" viewBox="0 0 14 18" fill="none" st
 function showInstallSteps(){
   let steps;
   if(isIOS&&isIOSSafari)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> en la barra de Safari (abajo, o arriba en iPad).`,`Baja en la lista y toca <span class="kbd">Agregar a pantalla de inicio</span> (en algunos iPhone dice «Añadir a pantalla de inicio»).`,`Toca <span class="kbd">Agregar</span>. El ícono de Spin Reservas aparece en tu pantalla de inicio.`];
+  else if(isInApp)steps=[`Estás dentro de otra app (WhatsApp, Instagram...). Desde aquí no se puede instalar.`,`Toca <b>Copiar enlace</b>, abre <span class="kbd">Safari</span> y pega el enlace en la barra de direcciones.`,`Ya en Safari, toca <span class="kbd">${SHARE_ICON} Compartir</span> y luego <span class="kbd">Agregar a pantalla de inicio</span>.`];
   else if(isIOS)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> de tu navegador.`,`Elige <span class="kbd">Agregar a pantalla de inicio</span> (en algunos iPhone dice «Añadir a pantalla de inicio»). Si no aparece, abre esta página en Safari y hazlo desde ahí.`,`Toca <span class="kbd">Agregar</span>.`];
   else steps=[`Abre el menú del navegador <span class="kbd">⋮</span>.`,`Toca <span class="kbd">Instalar app</span> o <span class="kbd">Agregar a pantalla principal</span>.`,`Confirma. El ícono aparece junto a tus otras apps.`];
-  $("#isteps").innerHTML=steps.map(s=>`<li>${s}</li>`).join("");$("#iscrim").hidden=false;$("#iclose").focus();
+  $("#isteps").innerHTML=steps.map(s=>`<li>${s}</li>`).join("");$("#icopy").hidden=!isInApp;
+  const hint=isIOSSafari&&/iphone|ipod/i.test(ua);$("#sharehint").hidden=!hint;$("#iscrim").classList.toggle("hint",hint);   // arrow pointing at Safari's bottom toolbar
+  $("#iscrim").hidden=false;$("#iclose").focus();
 }
 async function doInstall(){
   if(deferredPrompt){deferredPrompt.prompt();const r=await deferredPrompt.userChoice.catch(()=>null);deferredPrompt=null;updateInstallUI();if(r&&r.outcome==="accepted")return;return}
@@ -927,7 +945,9 @@ function nudgeInstall(){
 }
 $("#installgo").onclick=doInstall;$("#installsettings").onclick=doInstall;
 $("#installno").onclick=()=>{try{localStorage.setItem("sp-install-no",String(Date.now()))}catch(_){}updateInstallUI();toast("Puedes instalarla luego desde Cuenta")};
-$("#iclose").onclick=()=>$("#iscrim").hidden=true;
+$("#iclose").onclick=()=>{$("#iscrim").hidden=true;$("#sharehint").hidden=true};
+$("#icopy").onclick=copyLink;$("#inapp-copy").onclick=copyLink;
+$("#inapp").hidden=!isInApp;
 $("#iscrim").addEventListener("click",e=>{if(e.target.id==="iscrim")$("#iscrim").hidden=true});
 
 /* ---------- boot ---------- */
