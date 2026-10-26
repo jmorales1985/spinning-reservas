@@ -703,7 +703,11 @@ $("#cform").addEventListener("submit",async e=>{e.preventDefault();
   updateSummary();await loadData();renderAll();
 });
 /* ---------- admin: edit a class ---------- */
+const crHM=iso=>new Date(iso).toLocaleString("en-CA",{timeZone:CR_TZ,hour12:false}).split(", ")[1].slice(0,5).replace(/^24/,"00");
+// Later classes of the same series: same name, same weekday and same time of day (classes are not stored as a group)
+const sameSeries=c=>S.classes.filter(x=>x.id!==c.id&&x.starts_at>c.starts_at&&x.title===c.title&&crParts(x.starts_at).dow===crParts(c.starts_at).dow&&crHM(x.starts_at)===crHM(c.starts_at));
 function editClassSheet(c){
+  const series=sameSeries(c);
   const maxBike=Math.max(0,...resOf(c.id).map(r=>r.bike));   // capacity cannot drop below the highest booked bike
   const parts=new Date(c.starts_at).toLocaleString("en-CA",{timeZone:CR_TZ,hour12:false}).split(", ");   // "YYYY-MM-DD, HH:MM:SS"
   const when=`${parts[0]}T${parts[1].slice(0,5).replace(/^24/,"00")}`;
@@ -713,6 +717,7 @@ function editClassSheet(c){
   <div class="field"><label class="lbl">Fecha y hora</label><input class="e-when" type="datetime-local" required value="${when}"></div>
   <div class="row2" style="grid-template-columns:1fr 1fr"><div class="field"><label class="lbl">Duración (min)</label><input class="e-dur" type="number" min="15" max="180" required value="${c.duration_min}"></div>
   <div class="field"><label class="lbl">Bicis</label><input class="e-cap" type="number" min="${Math.max(1,maxBike)}" max="26" required value="${c.capacity}"></div></div>
+  ${series.length?`<label class="payopt"><input type="checkbox" class="e-series"><span><b>Aplicar a las próximas ${series.length} ${series.length===1?"clase igual":"clases iguales"}</b><small>Mismo nombre, día de la semana y hora. Las fechas no cambian; sí el nombre, instructor, hora, duración y bicis.</small></span></label>`:""}
   <button class="btn eat big" type="submit">Guardar cambios</button>`;
   const q=x=>box.querySelector(x);
   box.addEventListener("submit",async e=>{
@@ -720,9 +725,22 @@ function editClassSheet(c){
     const btn=q("button");btn.disabled=true;
     const d=new Date(q(".e-when").value);
     if(isNaN(d)){toast("Revisa la fecha y la hora");btn.disabled=false;return}
-    const r=await sb.from("spin_classes").update({title:q(".e-title").value.trim()||"Spinning",instructor:q(".e-inst").value.trim()||null,starts_at:d.toISOString(),duration_min:+q(".e-dur").value||45,capacity:+q(".e-cap").value}).eq("id",c.id);
+    const vals={title:q(".e-title").value.trim()||"Spinning",instructor:q(".e-inst").value.trim()||null,duration_min:+q(".e-dur").value||45,capacity:+q(".e-cap").value};
+    const all=q(".e-series")?.checked;
+    if(all){
+      const low=series.filter(x=>Math.max(0,...resOf(x.id).map(r=>r.bike))>vals.capacity);
+      if(low.length){toast(`Hay ${low.length} clases con bicis reservadas arriba de ${vals.capacity}. Sube la cantidad de bicis.`);btn.disabled=false;return}
+    }
+    const r=await sb.from("spin_classes").update({...vals,starts_at:d.toISOString()}).eq("id",c.id);
     if(r.error){toast(dbError(r.error));btn.disabled=false;return}
-    closeSheet();toast("Clase actualizada");await loadData();renderAll();
+    if(all){
+      const delta=d.getTime()-new Date(c.starts_at).getTime();
+      // dates stay; only the time of day moves (Costa Rica has no daylight saving, so shifting by the same delta is exact when the date is unchanged)
+      const dayShift=Math.round(delta/864e5)*864e5,tod=delta-dayShift;
+      const res=await Promise.all(series.map(x=>sb.from("spin_classes").update({...vals,starts_at:new Date(new Date(x.starts_at).getTime()+tod).toISOString()}).eq("id",x.id)));
+      const bad=res.find(z=>z.error);if(bad){toast(dbError(bad.error));await loadData();renderAll();return}
+    }
+    closeSheet();toast(all?`Clase y ${series.length} más actualizadas`:"Clase actualizada");await loadData();renderAll();
   });
   sheet("Editar clase",resOf(c.id).length?(resOf(c.id).length===1?"La reserva se conserva.":`Las ${resOf(c.id).length} reservas se conservan.`):"Cambia lo que necesites.",[],box);
 }
