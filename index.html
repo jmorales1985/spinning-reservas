@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Spin Reservas
+  RPM Spinning
   © 2026 Jason Morales Ramírez. Todos los derechos reservados.
 -->
 <html lang="es">
@@ -15,8 +15,8 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Spin">
-<title>Spin Reservas</title>
+<meta name="apple-mobile-web-app-title" content="RPM Spinning">
+<title>RPM Spinning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap">
 <style>
@@ -185,7 +185,7 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
   <button class="btn eat big" id="w-next" type="button">Siguiente</button>
 </main>
 <main class="auth" id="auth" hidden>
-  <h1>Spin<br>Reservas</h1>
+  <h1>RPM<br>Spinning</h1>
   <div class="tag">Elige tu bici en la sala de spinning.</div>
   <form id="aform" class="card stack">
     <h2 id="a-title">Entrar</h2>
@@ -201,12 +201,12 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
 </main>
 
 <div class="wrap" id="app" hidden>
-  <header class="top"><b>Spin Reservas</b><span class="who" id="who"></span></header>
+  <header class="top"><b>RPM Spinning</b><span class="who" id="who"></span></header>
 
   <section id="v-clases"><div class="stack">
     <div class="install" id="installbar" hidden>
       <img class="ic" src="/icon-192.png" alt="" width="40" height="40">
-      <div class="t"><b>Instala Spin Reservas</b><span>Reserva más rápido, desde tu pantalla de inicio</span></div>
+      <div class="t"><b>Instala RPM Spinning</b><span>Reserva más rápido, desde tu pantalla de inicio</span></div>
       <button class="btn" id="installgo" type="button">Instalar</button>
       <button class="x" id="installno" type="button" aria-label="Ahora no">×</button>
     </div>
@@ -308,7 +308,7 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
 
 <div class="sharehint" id="sharehint" hidden aria-hidden="true"><b>Toca Compartir</b><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15M6 13l6 6 6-6"/></svg></div>
 <div class="scrim" id="iscrim" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="it">
-  <h2 id="it">Instalar Spin Reservas</h2>
+  <h2 id="it">Instalar RPM Spinning</h2>
   <ol class="steps" id="isteps"></ol>
   <button class="btn eat" id="icopy" type="button" hidden>Copiar enlace</button>
   <button class="btn ghost" id="iclose" type="button">Entendido</button>
@@ -969,7 +969,7 @@ window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallUI(
 const SHARE_ICON='<svg width="14" height="16" viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V1M3.5 4.5 7 1l3.5 3.5"/><path d="M4 7H2v10h10V7h-2"/></svg>';
 function showInstallSteps(){
   let steps;
-  if(isIOS&&isIOSSafari)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> en la barra de Safari (abajo, o arriba en iPad).`,`Baja en la lista y toca <span class="kbd">Agregar a pantalla de inicio</span> (en algunos iPhone dice «Añadir a pantalla de inicio»).`,`Toca <span class="kbd">Agregar</span>. El ícono de Spin Reservas aparece en tu pantalla de inicio.`];
+  if(isIOS&&isIOSSafari)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> en la barra de Safari (abajo, o arriba en iPad).`,`Baja en la lista y toca <span class="kbd">Agregar a pantalla de inicio</span> (en algunos iPhone dice «Añadir a pantalla de inicio»).`,`Toca <span class="kbd">Agregar</span>. El ícono de RPM Spinning aparece en tu pantalla de inicio.`];
   else if(isInApp)steps=[`Estás dentro de otra app (WhatsApp, Instagram...). Desde aquí no se puede instalar.`,`Toca <b>Copiar enlace</b>, abre <span class="kbd">Safari</span> y pega el enlace en la barra de direcciones.`,`Ya en Safari, toca <span class="kbd">${SHARE_ICON} Compartir</span> y luego <span class="kbd">Agregar a pantalla de inicio</span>.`];
   else if(isIOS)steps=[`Toca el botón <span class="kbd">${SHARE_ICON} Compartir</span> de tu navegador.`,`Elige <span class="kbd">Agregar a pantalla de inicio</span> (en algunos iPhone dice «Añadir a pantalla de inicio»). Si no aparece, abre esta página en Safari y hazlo desde ahí.`,`Toca <span class="kbd">Agregar</span>.`];
   else steps=[`Abre el menú del navegador <span class="kbd">⋮</span>.`,`Toca <span class="kbd">Instalar app</span> o <span class="kbd">Agregar a pantalla principal</span>.`,`Confirma. El ícono aparece junto a tus otras apps.`];
@@ -984,7 +984,7 @@ async function doInstall(){
 // After a first successful booking, once per visit, suggest installing (the best moment: they just saw the value)
 function nudgeInstall(){
   if(nudged||isStandalone())return;nudged=true;
-  setTimeout(()=>sheet("Instala la app","Tendrás Spin Reservas en tu pantalla de inicio para reservar tu bici en segundos.",[{label:"Instalar",cls:"eat big",fn:doInstall}]),900);
+  setTimeout(()=>sheet("Instala la app","Tendrás RPM Spinning en tu pantalla de inicio para reservar tu bici en segundos.",[{label:"Instalar",cls:"eat big",fn:doInstall}]),900);
 }
 $("#installgo").onclick=doInstall;$("#installsettings").onclick=doInstall;
 $("#installno").onclick=()=>{try{localStorage.setItem("sp-install-no",String(Date.now()))}catch(_){}updateInstallUI();toast("Puedes instalarla luego desde Cuenta")};
@@ -995,7 +995,7 @@ $("#iscrim").addEventListener("click",e=>{if(e.target.id==="iscrim")$("#iscrim")
 
 /* ---------- boot ---------- */
 setAuthMode("in");bioUI();updateInstallUI();
-console.log("%cSpin Reservas","font-weight:900;font-size:16px","\n© 2026 Jason Morales Ramírez. Todos los derechos reservados.");
+console.log("%cRPM Spinning","font-weight:900;font-size:16px","\n© 2026 Jason Morales Ramírez. Todos los derechos reservados.");
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
 </script>
 </body>

@@ -1,4 +1,4 @@
-# Spin Reservas
+# RPM Spinning
 
 App web (PWA) para reservar bicis en una sala de spinning de 26 bicis numeradas, acomodadas en arcos alrededor del instructor, como asientos de cine.
 
