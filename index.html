@@ -194,6 +194,7 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
     <label class="remember" for="a-rem"><input id="a-rem" type="checkbox" checked> Recordar mi correo en este teléfono</label>
     <div id="a-msg" role="status"></div>
     <button class="btn eat" id="a-go" type="submit">Entrar</button>
+    <button class="linkbtn" id="a-forgot" type="button">¿Olvidaste tu contraseña?</button>
     <button class="linkbtn" id="a-switch" type="button">¿No tienes cuenta? Crear una</button>
   </form>
   <button class="btn bio" id="a-bio" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-7 7v2M19 12v-2a7 7 0 0 0-11-5.7"/><path d="M8.5 21c1-1.6 1.5-3.6 1.5-6v-4a2 2 0 0 1 4 0v4c0 1.2-.1 2.3-.4 3.4"/><path d="M5 15.5c.6-1 1-2.3 1-3.5M18.4 15.5c-.3 1.6-.8 3-1.6 4.3"/></svg><span id="a-bio-l">Entrar con biometría</span></button>
@@ -285,6 +286,12 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
         <div class="field"><label class="lbl" for="u-name">Nombre</label><input id="u-name" maxlength="40" required></div>
         <button class="btn eat" type="submit">Guardar</button>
       </form>
+      <form class="card stack" id="pwform">
+        <h2>Cambiar contraseña</h2>
+        <input type="text" autocomplete="username" hidden>
+        <div class="field"><label class="lbl" for="pw-new">Nueva contraseña</label><input id="pw-new" type="password" autocomplete="new-password" minlength="6" required></div>
+        <button class="btn eat" type="submit">Cambiar contraseña</button>
+      </form>
       <div class="card stack" id="biosec" hidden>
         <h2 id="bio-title">Entrar con biometría</h2>
         <div id="biolist"></div>
@@ -322,6 +329,15 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
   <button class="btn eat" type="submit">Continuar</button>
 </form></div>
 
+<div class="scrim" id="rscrim" style="z-index:20" hidden><form class="sheet" id="rform">
+  <h2>Nueva contraseña</h2><p>Escribe la contraseña nueva para tu cuenta.</p>
+  <input type="text" autocomplete="username" hidden>
+  <input id="rc-pw" type="password" minlength="6" required placeholder="Nueva contraseña (mínimo 6)" autocomplete="new-password">
+  <div id="rc-msg" role="status"></div>
+  <button class="btn eat" id="rc-go" type="submit">Guardar contraseña</button>
+  <button class="linkbtn" id="rc-skip" type="button">Ahora no</button>
+</form></div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
 "use strict";
@@ -354,8 +370,35 @@ const rememberedEmail=()=>{try{return localStorage.getItem("sp-email")||""}catch
 let authMode="in";
 let welcomed=false;   // the banner shows once per app open, before the login form
 function showAuth(on){$("#welcome").hidden=!(on&&!welcomed);$("#auth").hidden=!on||!welcomed;$("#app").hidden=on;$("#tabs").hidden=on;if(on&&welcomed){const em=rememberedEmail();if(em&&!$("#a-email").value)$("#a-email").value=em}}
-function setAuthMode(m){authMode=m;$("#a-title").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-go").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-switch").textContent=m==="in"?"¿No tienes cuenta? Crear una":"¿Ya tienes cuenta? Entrar";$("#a-msg").textContent="";$("#a-pw").autocomplete=m==="in"?"current-password":"new-password"}
+function setAuthMode(m){authMode=m;$("#a-title").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-go").textContent=m==="in"?"Entrar":"Crear cuenta";$("#a-switch").textContent=m==="in"?"¿No tienes cuenta? Crear una":"¿Ya tienes cuenta? Entrar";$("#a-msg").textContent="";$("#a-pw").autocomplete=m==="in"?"current-password":"new-password";$("#a-forgot").hidden=m!=="in"}
 $("#a-switch").onclick=()=>setAuthMode(authMode==="in"?"up":"in");
+// Password reset: e-mail a recovery link; the link signs the person in and fires PASSWORD_RECOVERY (handled below)
+$("#a-forgot").onclick=async()=>{
+  const email=$("#a-email").value.trim(),msg=$("#a-msg"),b=$("#a-forgot");
+  if(!email){msg.textContent="Escribe tu correo arriba y vuelve a tocar «¿Olvidaste tu contraseña?».";$("#a-email").focus();return}
+  b.disabled=true;msg.textContent="Enviando…";
+  const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+  b.disabled=false;
+  if(r.error){msg.textContent=/rate limit|security purposes/i.test(r.error.message)?"Se pidieron muchos correos seguidos. Espera unos minutos e inténtalo de nuevo.":r.error.message;return}
+  msg.textContent="Si ese correo tiene cuenta, te enviamos un enlace para crear una contraseña nueva. Revisa también el correo no deseado.";
+};
+$("#rform").addEventListener("submit",async e=>{e.preventDefault();
+  const pw=$("#rc-pw").value,btn=$("#rc-go"),msg=$("#rc-msg");
+  if(pw.length<6){msg.textContent="La contraseña necesita al menos 6 caracteres.";return}
+  btn.disabled=true;msg.textContent="";
+  const r=await sb.auth.updateUser({password:pw});
+  btn.disabled=false;
+  if(r.error){msg.textContent=r.error.message;return}
+  $("#rc-pw").value="";$("#rscrim").hidden=true;toast("Contraseña cambiada");
+});
+$("#rc-skip").onclick=()=>{$("#rc-pw").value="";$("#rscrim").hidden=true};
+// Change password while signed in (Cuenta tab)
+$("#pwform").addEventListener("submit",async e=>{e.preventDefault();
+  const pw=$("#pw-new").value;if(pw.length<6){toast("La contraseña necesita al menos 6 caracteres");return}
+  const r=await sb.auth.updateUser({password:pw});
+  if(r.error){toast(r.error.message);return}
+  $("#pw-new").value="";toast("Contraseña cambiada");
+});
 $("#aform").addEventListener("submit",async e=>{e.preventDefault();
   const email=$("#a-email").value.trim(),password=$("#a-pw").value,btn=$("#a-go"),msg=$("#a-msg");
   if(password.length<6){msg.textContent="La contraseña necesita al menos 6 caracteres.";return}
@@ -942,6 +985,7 @@ async function startSession(user){
   S.channel=sb.channel("spin").on("postgres_changes",{event:"*",schema:"public",table:"spin_reservations"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_classes"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_holds"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_class_blocks"},refresh).subscribe();
 }
 sb.auth.onAuthStateChange((ev,session)=>{
+  if(ev==="PASSWORD_RECOVERY"){try{history.replaceState(null,"",location.pathname)}catch(_){}welcomed=true;$("#rscrim").hidden=false;setTimeout(()=>$("#rc-pw").focus(),80)}
   if(session?.user&&ev==="INITIAL_SESSION"){
     const last=idleGet();
     if(last&&Date.now()-last>IDLE_MS){S.user={id:session.user.id};setTimeout(idleSignOut,0);return}
@@ -950,7 +994,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
   if(session?.user)setTimeout(()=>startSession(session.user),0);
   else{
     if(S.channel){sb.removeChannel(S.channel);S.channel=null}
-    S.user=null;S.admin=false;S.name="";S.classes=[];S.res=[];S.current=null;S.cal={month:null,sel:null};closeSheet();$("#nscrim").hidden=true;showAuth(true);
+    S.user=null;S.admin=false;S.name="";S.classes=[];S.res=[];S.current=null;S.cal={month:null,sel:null};closeSheet();$("#nscrim").hidden=true;$("#rscrim").hidden=true;showAuth(true);
   }
 });
 
