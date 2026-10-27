@@ -570,7 +570,7 @@ async function cancel(r){
 }
 /* ---------- payment: SIMPE proof or pay at the studio ---------- */
 const CLASS_PRICE="₡2.000";
-const SIMPE_INFO="SIMPE Móvil al +506 6290 9375, a nombre de Luis Carlos Alfaro";   // shown when someone picks SIMPE
+const SIMPE_INFO=`SIMPE Móvil de ${CLASS_PRICE} al +506 6290 9375, a nombre de Luis Carlos Alfaro`;   // shown when someone picks SIMPE
 const payOf=r=>S.pay?.get(r.id)||null;
 function payLabel(r){const p=payOf(r);if(!p)return"Sin forma de pago";if(p.paid)return"Pagado ✓";return p.method==="simpe"?"SIMPE (comprobante por revisar)":"Paga en el lugar"}
 const later=fn=>setTimeout(fn,60);   // sheet() closes itself after an action, so open the next sheet afterwards
