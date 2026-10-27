@@ -254,8 +254,10 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
           <div class="seg" role="group" aria-label="Tipo"><button type="button" class="segb" data-htype="block" aria-pressed="true">Bloquear bici</button><button type="button" class="segb" data-htype="fixed" aria-pressed="false">Reserva fija</button></div>
           <div class="field"><span class="lbl" id="h-bikes-l">Bici(s)</span><div class="bgrid" id="hbikes"></div></div>
           <div class="field" id="h-who" hidden><label class="lbl" for="h-sel">Persona</label><select id="h-sel" hidden><option value="">Elige una persona…</option></select><input id="h-email" type="email" inputmode="email" autocapitalize="off" autocomplete="off" placeholder="Correo de la persona"></div>
-          <div class="row2"><div class="field"><label class="lbl" for="h-from">Desde</label><input id="h-from" type="date" required></div><div class="field"><label class="lbl" for="h-to">Hasta (vacío = sin fecha final)</label><input id="h-to" type="date"></div></div>
-          <div class="field"><span class="lbl">Solo estos días (vacío = todos)</span><div class="days" id="h-days"></div></div>
+          <div class="field" id="h-scope" hidden><span class="lbl">¿Para cuáles clases?</span><div class="seg" role="group" aria-label="Alcance"><button type="button" class="segb" data-hscope="period" aria-pressed="true">Por periodo</button><button type="button" class="segb" data-hscope="classes" aria-pressed="false">Clases elegidas</button></div></div>
+          <div class="field" id="h-classes" hidden><span class="lbl">Elige las clases</span><div class="stack" id="h-clist" style="gap:6px"></div></div>
+          <div id="h-period" class="stack"><div class="row2"><div class="field"><label class="lbl" for="h-from">Desde</label><input id="h-from" type="date" required></div><div class="field"><label class="lbl" for="h-to">Hasta (vacío = sin fecha final)</label><input id="h-to" type="date"></div></div>
+          <div class="field"><span class="lbl">Solo estos días (vacío = todos)</span><div class="days" id="h-days"></div></div></div>
           <div class="field"><label class="lbl" for="h-note">Nota (opcional)</label><input id="h-note" maxlength="60" placeholder="Ej: en reparación"></div>
           <button class="btn eat" id="h-go" type="submit">Bloquear</button>
         </form>
@@ -747,6 +749,7 @@ function editClassSheet(c){
   });
   sheet("Editar clase",resOf(c.id).length?(resOf(c.id).length===1?"La reserva se conserva.":`Las ${resOf(c.id).length} reservas se conservan.`):"Cambia lo que necesites.",[],box);
 }
+$("#h-clist").addEventListener("change",e=>{const id=e.target.dataset.hclass;if(id)e.target.checked?H.classes.add(id):H.classes.delete(id)});
 $("#h-sel").addEventListener("change",e=>{$("#h-email").value=e.target.value});
 document.addEventListener("click",e=>{
   if(e.target.closest("#editcls")){const c=S.classes.find(x=>x.id===S.current);if(c)editClassSheet(c);return}
@@ -779,7 +782,7 @@ document.addEventListener("click",e=>{
 });
 
 /* ---------- admin: bikes set aside for a period (blocks and fixed reservations) ---------- */
-const H={type:"block",bikes:new Set()};
+const H={type:"block",scope:"period",bikes:new Set(),classes:new Set()};
 const fHoldDay=new Intl.DateTimeFormat("es-CR",{day:"numeric",month:"short",year:"numeric"});
 const hdate=s=>{const [y,m,d]=s.split("-").map(Number);return fHoldDay.format(new Date(y,m-1,d))};
 function holdText(h){
@@ -791,9 +794,14 @@ $("#h-days").addEventListener("click",e=>{const b=e.target.closest(".dbtn");if(b
 function renderHoldPicker(){
   $("#hbikes").innerHTML=Array.from({length:26},(_,i)=>i+1).map(n=>`<button type="button" class="bb" data-hbike="${n}" aria-pressed="${H.bikes.has(n)}" aria-label="Bici ${n}">${n}</button>`).join("");
   document.querySelectorAll("[data-htype]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.htype===H.type)));
-  $("#h-who").hidden=H.type!=="fixed";
+  const fx=H.type==="fixed",byClass=fx&&H.scope==="classes";
+  $("#h-who").hidden=!fx;$("#h-scope").hidden=!fx;$("#h-classes").hidden=!byClass;$("#h-period").hidden=byClass;
+  document.querySelectorAll("[data-hscope]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.hscope===H.scope)));
+  const up=S.classes.filter(c=>new Date(c.starts_at)>new Date()).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
+  $("#h-clist").innerHTML=up.length?up.map(c=>`<label class="payopt" style="padding:8px 12px;align-items:center"><input type="checkbox" data-hclass="${c.id}"${H.classes.has(c.id)?" checked":""}><span>${esc(cap1(fDay.format(new Date(c.starts_at))))} · ${esc(fTime.format(new Date(c.starts_at)))}<small>${esc(c.title)}${c.instructor?" · "+esc(c.instructor):""}</small></span></label>`).join(""):`<div class="muted">No hay clases próximas.</div>`;
   $("#h-bikes-l").textContent=H.type==="fixed"?"Bici (una)":"Bici(s)";
   $("#h-go").textContent=H.type==="fixed"?"Reservar fija":"Bloquear";
+  $("#h-from").required=!byClass;
 }
 function renderHolds(){
   const off=S.holds===null;
@@ -822,6 +830,8 @@ async function removeHold(id){
   toast("Listo, quitado");await loadData();renderAll();
 }
 document.addEventListener("click",e=>{
+  const sc=e.target.closest("[data-hscope]");
+  if(sc){H.scope=sc.dataset.hscope;renderHoldPicker();return}
   const t=e.target.closest("[data-htype]");
   if(t){H.type=t.dataset.htype;if(H.type==="fixed"&&H.bikes.size>1)H.bikes=new Set([[...H.bikes][0]]);renderHoldPicker();return}
   const b=e.target.closest("[data-hbike]");
@@ -835,6 +845,23 @@ document.addEventListener("click",e=>{
 $("#hform").addEventListener("submit",async e=>{e.preventDefault();
   const btn=$("#h-go"),bikes=[...H.bikes].sort((a,b)=>a-b),fixed=H.type==="fixed";
   if(!bikes.length){toast("Elige al menos una bici");return}
+  if(fixed&&H.scope==="classes"){
+    const email=$("#h-email").value.trim();
+    if(!email){toast($("#h-sel").hidden?"Escribe el correo de la persona":"Elige una persona de la lista");return}
+    if(!H.classes.size){toast("Elige al menos una clase");return}
+    btn.disabled=true;const tally={};
+    for(const id of H.classes){
+      const r=await sb.rpc("spin_reserve_for",{p_class:id,p_bike:bikes[0],p_email:email});
+      if(r.error){btn.disabled=false;toast(r.error.code==="PGRST202"?"Falta activar esta función: ejecuta supabase/class_holds.sql en Supabase":dbError(r.error));return}
+      if(r.data==="not_found"){btn.disabled=false;toast("No encontré una cuenta confirmada con ese correo");return}
+      tally[r.data]=(tally[r.data]||0)+1;
+    }
+    btn.disabled=false;
+    const ok=tally.ok||0,skip=Object.entries(tally).filter(([k])=>k!=="ok").reduce((n,[,v])=>n+v,0);
+    toast(`${ok} ${ok===1?"clase asignada":"clases asignadas"}${skip?`, ${skip} sin poder asignar (bici ocupada o bloqueada, o la persona ya tenía reserva)`:""}`);
+    H.bikes=new Set();H.classes=new Set();$("#h-email").value="";$("#h-sel").value="";
+    await loadData();renderAll();return;
+  }
   const from=$("#h-from").value,to=$("#h-to").value||null;
   if(!from){toast("Elige la fecha de inicio");return}
   if(to&&to<from){toast("La fecha final es antes de la inicial");return}
