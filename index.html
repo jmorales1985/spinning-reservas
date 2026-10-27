@@ -253,7 +253,7 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
         <form id="hform" class="stack">
           <div class="seg" role="group" aria-label="Tipo"><button type="button" class="segb" data-htype="block" aria-pressed="true">Bloquear bici</button><button type="button" class="segb" data-htype="fixed" aria-pressed="false">Reserva fija</button></div>
           <div class="field"><span class="lbl" id="h-bikes-l">Bici(s)</span><div class="bgrid" id="hbikes"></div></div>
-          <div class="field" id="h-who" hidden><label class="lbl" for="h-email">Correo de la persona</label><input id="h-email" type="email" inputmode="email" autocapitalize="off" autocomplete="off" list="h-users" placeholder="Escribe para buscar o elige de la lista"><datalist id="h-users"></datalist></div>
+          <div class="field" id="h-who" hidden><label class="lbl" for="h-sel">Persona</label><select id="h-sel" hidden><option value="">Elige una persona…</option></select><input id="h-email" type="email" inputmode="email" autocapitalize="off" autocomplete="off" placeholder="Correo de la persona"></div>
           <div class="row2"><div class="field"><label class="lbl" for="h-from">Desde</label><input id="h-from" type="date" required></div><div class="field"><label class="lbl" for="h-to">Hasta (vacío = sin fecha final)</label><input id="h-to" type="date"></div></div>
           <div class="field"><span class="lbl">Solo estos días (vacío = todos)</span><div class="days" id="h-days"></div></div>
           <div class="field"><label class="lbl" for="h-note">Nota (opcional)</label><input id="h-note" maxlength="60" placeholder="Ej: en reparación"></div>
@@ -404,7 +404,10 @@ async function loadData(){
     // Admin-only RPCs (names + emails, admin list). They fail until supabase/admin_and_roster.sql has been run; the UI falls back gracefully.
     const ro=await sb.rpc("spin_roster");S.roster=ro.error?null:ro.data;
     const us=await sb.rpc("spin_list_users");S.users=us.error?null:us.data;   // registered clients, for the fixed-reservation picker (supabase/list_users.sql)
-    $("#h-users").innerHTML=(S.users||[]).map(u=>`<option value="${esc(u.email)}">${esc(u.display_name||"")}</option>`).join("");
+    // Dropdown of registered clients (supabase/list_users.sql); if it is not available the plain email field is used
+    const sel=$("#h-sel"),cur=sel.value;
+    sel.innerHTML=`<option value="">Elige una persona…</option>`+(S.users||[]).map(u=>`<option value="${esc(u.email)}">${esc(u.display_name?u.display_name+" · ":"")}${esc(u.email)}</option>`).join("");
+    sel.value=cur;sel.hidden=!S.users?.length;$("#h-email").hidden=!!S.users?.length;
     const ad=await sb.rpc("spin_list_admins");S.admins=ad.error?null:ad.data;
     if(S.holds!==null){const hi=await sb.rpc("spin_list_holds");S.holdInfo=hi.error?{}:Object.fromEntries(hi.data.map(x=>[x.id,x]))}
   }
@@ -744,6 +747,7 @@ function editClassSheet(c){
   });
   sheet("Editar clase",resOf(c.id).length?(resOf(c.id).length===1?"La reserva se conserva.":`Las ${resOf(c.id).length} reservas se conservan.`):"Cambia lo que necesites.",[],box);
 }
+$("#h-sel").addEventListener("change",e=>{$("#h-email").value=e.target.value});
 document.addEventListener("click",e=>{
   if(e.target.closest("#editcls")){const c=S.classes.find(x=>x.id===S.current);if(c)editClassSheet(c);return}
   if(!e.target.closest("#delcls"))return;
@@ -835,7 +839,7 @@ $("#hform").addEventListener("submit",async e=>{e.preventDefault();
   if(!from){toast("Elige la fecha de inicio");return}
   if(to&&to<from){toast("La fecha final es antes de la inicial");return}
   const email=fixed?$("#h-email").value.trim():null;
-  if(fixed&&!email){toast("Escribe el correo de la persona");return}
+  if(fixed&&!email){toast($("#h-sel").hidden?"Escribe el correo de la persona":"Elige una persona de la lista");return}
   const days=pickedDays("#h-days"),note=$("#h-note").value.trim()||null;
   btn.disabled=true;let made=0,kept=0,left=0;
   for(const bike of bikes){
@@ -847,7 +851,7 @@ $("#hform").addEventListener("submit",async e=>{e.preventDefault();
   btn.disabled=false;
   const pl=(n,s,p)=>`${n} ${n===1?s:p}`;
   toast(fixed?`Reserva fija lista: ${pl(kept,"clase asignada","clases asignadas")}${left?`, ${left} sin poder asignar (bici o persona ya ocupada)`:""}`:`${made===1?"Bici bloqueada":made+" bicis bloqueadas"}${left?`. ${pl(left,"reserva existente se respeta","reservas existentes se respetan")}`:""}`);
-  H.bikes=new Set();$("#h-note").value="";$("#h-email").value="";
+  H.bikes=new Set();$("#h-note").value="";$("#h-email").value="";$("#h-sel").value="";
   await loadData();renderAll();
 });
 $("#h-from").value=crParts(new Date().toISOString()).date;
