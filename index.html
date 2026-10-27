@@ -344,6 +344,7 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
 /* ---------- setup (own Supabase project: spinning-reservas) ---------- */
 const SB_URL="https://nsbixmqkrwcbmgskivol.supabase.co";
 const SB_KEY="sb_publishable_7UycRVk1M1X4GmxSBmjy_g_VHcD3IF1";
+let recovering=/type=recovery/.test(location.hash+location.search);   // opened from a password-reset e-mail: the idle sign-out must not kill that session
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,experimental:{passkey:true}}});
 
 const $=s=>document.querySelector(s);
@@ -389,9 +390,9 @@ $("#rform").addEventListener("submit",async e=>{e.preventDefault();
   const r=await sb.auth.updateUser({password:pw});
   btn.disabled=false;
   if(r.error){msg.textContent=r.error.message;return}
-  $("#rc-pw").value="";$("#rscrim").hidden=true;toast("Contraseña cambiada");
+  $("#rc-pw").value="";$("#rscrim").hidden=true;recovering=false;idleTouch(true);toast("Contraseña cambiada");
 });
-$("#rc-skip").onclick=()=>{$("#rc-pw").value="";$("#rscrim").hidden=true};
+$("#rc-skip").onclick=()=>{$("#rc-pw").value="";$("#rscrim").hidden=true;recovering=false;idleTouch(true)};
 // Change password while signed in (Cuenta tab)
 $("#pwform").addEventListener("submit",async e=>{e.preventDefault();
   const pw=$("#pw-new").value;if(pw.length<6){toast("La contraseña necesita al menos 6 caracteres");return}
@@ -411,6 +412,11 @@ $("#aform").addEventListener("submit",async e=>{e.preventDefault();
 });
 $("#signout").onclick=async()=>{$("#a-msg").textContent="";await sb.auth.signOut({scope:"local"})};
 (()=>{const em=rememberedEmail();if(em){$("#a-email").value=em;$("#a-rem").checked=true}})();
+// An expired or already-used reset link comes back with an error in the URL
+if(/error_code=|error=access_denied/.test(location.hash+location.search)){
+  recovering=false;try{history.replaceState(null,"",location.pathname)}catch(_){}
+  setTimeout(()=>{$("#a-msg").textContent="Ese enlace ya se usó o venció. Toca «¿Olvidaste tu contraseña?» para recibir uno nuevo."},0);
+}
 $("#a-rem").addEventListener("change",e=>{if(!e.target.checked)rememberEmail("")});
 
 /* ---------- idle sign-out after 5 minutes ---------- */
@@ -418,7 +424,7 @@ const IDLE_MS=5*60*1000;
 const idleGet=()=>{try{return +localStorage.getItem("sp-last")||0}catch(_){return 0}};
 let idleLastWrite=0,idleOut=false;
 function idleTouch(force){const now=Date.now();if(!force&&now-idleLastWrite<15000)return;idleLastWrite=now;try{localStorage.setItem("sp-last",String(now))}catch(_){}}
-async function idleSignOut(){if(idleOut||!S.user)return;idleOut=true;try{await sb.auth.signOut({scope:"local"})}catch(_){}idleOut=false;$("#a-msg").textContent="Por seguridad se cerró la sesión tras 5 minutos sin uso."}
+async function idleSignOut(){if(idleOut||!S.user||recovering)return;idleOut=true;try{await sb.auth.signOut({scope:"local"})}catch(_){}idleOut=false;$("#a-msg").textContent="Por seguridad se cerró la sesión tras 5 minutos sin uso."}
 function idleCheck(){if(!S.user)return;const last=idleGet();if(last&&Date.now()-last>IDLE_MS)idleSignOut()}
 ["pointerdown","keydown","touchstart","scroll","input"].forEach(ev=>document.addEventListener(ev,()=>{if(S.user&&document.visibilityState==="visible")idleTouch()},{passive:true,capture:true}));
 $("#w-next").onclick=()=>{welcomed=true;showAuth(true);$("#a-email").focus?.()};
@@ -985,8 +991,8 @@ async function startSession(user){
   S.channel=sb.channel("spin").on("postgres_changes",{event:"*",schema:"public",table:"spin_reservations"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_classes"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_holds"},refresh).on("postgres_changes",{event:"*",schema:"public",table:"spin_class_blocks"},refresh).subscribe();
 }
 sb.auth.onAuthStateChange((ev,session)=>{
-  if(ev==="PASSWORD_RECOVERY"){try{history.replaceState(null,"",location.pathname)}catch(_){}welcomed=true;$("#rscrim").hidden=false;setTimeout(()=>$("#rc-pw").focus(),80)}
-  if(session?.user&&ev==="INITIAL_SESSION"){
+  if(ev==="PASSWORD_RECOVERY"){recovering=true;idleTouch(true);try{history.replaceState(null,"",location.pathname)}catch(_){}welcomed=true;$("#rscrim").hidden=false;setTimeout(()=>$("#rc-pw").focus(),80)}
+  if(session?.user&&ev==="INITIAL_SESSION"&&!recovering){
     const last=idleGet();
     if(last&&Date.now()-last>IDLE_MS){S.user={id:session.user.id};setTimeout(idleSignOut,0);return}
   }
