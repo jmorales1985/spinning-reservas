@@ -71,7 +71,7 @@ input:focus,select:focus{border-color:var(--eat);outline:none}
 .top b{font-family:var(--display);font-stretch:62%;font-weight:900;font-size:1.05rem;letter-spacing:.04em;text-transform:uppercase}
 .top .who{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50vw}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs button{flex:1;background:none;border:0;padding:12px 4px;font-weight:700;font-size:.82rem;color:var(--muted);border-top:3px solid transparent}
+.tabs button{flex:1;background:none;border:0;padding:12px 2px;font-weight:700;font-size:.78rem;color:var(--muted);border-top:3px solid transparent}
 .tabs button[aria-selected="true"]{color:var(--ink);border-top-color:var(--eat)}
 section{padding-top:14px}
 section>.stack{gap:12px}
@@ -164,6 +164,13 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
 .bgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .bb{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 0;font-weight:800;font-size:.9rem}
 .bb[aria-pressed="true"]{background:var(--eat);border-color:var(--eat);color:#fff}
+.rep summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rep summary::-webkit-details-marker{display:none}
+.rep[open] summary{margin-bottom:8px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi b{display:block;font-size:1.15rem}
+.kpi span{font-size:.75rem;color:var(--muted)}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .segb{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 0;font-weight:700}
 .segb[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
@@ -278,6 +285,20 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
     </div>
   </section>
 
+  <section id="v-reportes" hidden>
+    <div class="stack">
+      <div class="card stack">
+        <div class="seg" id="r-views" role="group" aria-label="Tipo de reporte" style="grid-template-columns:repeat(3,1fr)"><button type="button" class="segb" data-rview="clase" aria-pressed="true">Por clase</button><button type="button" class="segb" data-rview="cliente" aria-pressed="false">Por cliente</button><button type="button" class="segb" data-rview="simpe" aria-pressed="false">SIMPE</button></div>
+        <div class="row2"><div class="field"><label class="lbl" for="r-from">Desde</label><input id="r-from" type="date"></div><div class="field"><label class="lbl" for="r-to">Hasta</label><input id="r-to" type="date"></div></div>
+        <div class="seg" id="r-pre" style="grid-template-columns:repeat(4,1fr)"><button type="button" class="segb" data-rpre="hoy" style="font-size:.78rem">Hoy</button><button type="button" class="segb" data-rpre="semana" style="font-size:.78rem">Semana</button><button type="button" class="segb" data-rpre="mes" style="font-size:.78rem">Este mes</button><button type="button" class="segb" data-rpre="mesant" style="font-size:.78rem">Mes pasado</button></div>
+        <div class="field" id="r-qwrap" hidden><label class="lbl" for="r-q">Buscar cliente</label><input id="r-q" placeholder="Nombre o correo" autocomplete="off"></div>
+        <div class="seg" id="r-sf" hidden style="grid-template-columns:repeat(3,1fr)"><button type="button" class="segb" data-rsf="todos" aria-pressed="true" style="font-size:.78rem">Todos</button><button type="button" class="segb" data-rsf="revisar" aria-pressed="false" style="font-size:.78rem">Por revisar</button><button type="button" class="segb" data-rsf="pagado" aria-pressed="false" style="font-size:.78rem">Confirmados</button></div>
+      </div>
+      <div id="r-sum"></div>
+      <div id="r-body" class="stack"></div>
+      <button class="btn ghost" id="r-csv" type="button">Descargar CSV</button>
+    </div>
+  </section>
   <section id="v-cuenta" hidden>
     <div class="stack">
       <form class="card stack" id="nform">
@@ -308,6 +329,7 @@ img.proof{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;backg
   <button data-v="clases" aria-selected="true">Clases</button>
   <button data-v="mias" aria-selected="false">Mis reservas</button>
   <button data-v="admin" aria-selected="false" id="tab-admin" hidden>Admin</button>
+  <button data-v="reportes" aria-selected="false" id="tab-rep" hidden>Reportes</button>
   <button data-v="cuenta" aria-selected="false">Cuenta</button>
 </nav>
 
@@ -487,14 +509,15 @@ const takenCount=c=>resOf(c.id).filter(r=>r.bike<=c.capacity).length;
 /* ---------- rendering ---------- */
 function showView(v){
   S.tab=v;S.current=null;
-  ["clases","class","mias","admin","cuenta"].forEach(x=>$("#v-"+x).hidden=true);
+  ["clases","class","mias","admin","reportes","cuenta"].forEach(x=>$("#v-"+x).hidden=true);
   $("#v-"+v).hidden=false;
+  if(v==="reportes")loadReport();
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.v===v)));
   renderAll();
 }
 function renderAll(){
   $("#who").textContent=S.name||S.user?.email||"";
-  $("#tab-admin").hidden=!S.admin;
+  $("#tab-admin").hidden=!S.admin;$("#tab-rep").hidden=!S.admin;
   renderClasses();renderMine();renderAdmin();
   if(S.current)renderClass();
 }
@@ -666,12 +689,15 @@ async function setPay(r,method,path){
   if(p.error)throw p.error;
   toast("Forma de pago guardada");await loadData();renderAll();
 }
-async function showProof(r){
-  const p=payOf(r);if(!p?.proof_path)return;
-  const u=await sb.storage.from("spin-proofs").createSignedUrl(p.proof_path,300);
+async function showProofPath(path,sub){
+  const u=await sb.storage.from("spin-proofs").createSignedUrl(path,300);
   if(u.error){toast(dbError(u.error));return}
   const img=document.createElement("img");img.src=u.data.signedUrl;img.alt="Comprobante SIMPE";img.className="proof";
-  sheet("Comprobante SIMPE",`${whoIs(r.user_id).name} · bici ${r.bike}`,[],img);
+  sheet("Comprobante SIMPE",sub,[],img);
+}
+async function showProof(r){
+  const p=payOf(r);if(!p?.proof_path)return;
+  return showProofPath(p.proof_path,`${whoIs(r.user_id).name} · bici ${r.bike}`);
 }
 // admin actions for one reservation: view proof, mark paid / not paid
 function payActions(r){
@@ -964,6 +990,94 @@ $("#hform").addEventListener("submit",async e=>{e.preventDefault();
 });
 $("#h-from").value=crParts(new Date().toISOString()).date;
 renderHoldPicker();
+
+/* ---------- admin reports (supabase/reports.sql) ---------- */
+const PRICE_N=2000;   // price of one class, in colones
+const money=n=>"₡"+String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,".");
+const fShort=new Intl.DateTimeFormat("es-CR",{weekday:"short",day:"numeric",month:"short"});
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function presetRange(k){
+  const p=crParts(new Date().toISOString()),[y,m,d]=p.date.split("-").map(Number);
+  if(k==="hoy")return[p.date,p.date];
+  if(k==="semana"){const a=new Date(y,m-1,d-((p.dow+6)%7)),b=new Date(a.getFullYear(),a.getMonth(),a.getDate()+6);return[ymd(a),ymd(b)]}
+  if(k==="mes")return[ymd(new Date(y,m-1,1)),ymd(new Date(y,m,0))];
+  return[ymd(new Date(y,m-2,1)),ymd(new Date(y,m-1,0))];
+}
+const R={view:"clase",from:"",to:"",rows:null,err:"",q:"",sf:"todos",tok:0};
+async function loadReport(){
+  if(!S.admin)return;
+  if(!R.from)[R.from,R.to]=presetRange("mes");
+  const tok=++R.tok;R.rows=null;R.err="";renderReports();
+  if(!R.from||!R.to||R.to<R.from){R.rows=[];R.err="La fecha final es antes de la inicial.";renderReports();return}
+  const r=await sb.rpc("spin_report",{p_from:R.from,p_to:R.to});
+  if(tok!==R.tok)return;
+  if(r.error){R.err=r.error.code==="PGRST202"?"off":dbError(r.error);R.rows=[]}else R.rows=r.data;
+  renderReports();
+}
+const rStatus=x=>x.paid?"Pagado ✓":x.method==="simpe"?"SIMPE por revisar":x.method==="local"?"Paga en el lugar":"Sin forma de pago";
+const rName=x=>x.display_name||x.email||"Sin nombre";
+const rWhen=x=>`${cap1(fShort.format(new Date(x.starts_at)))} · ${fTime.format(new Date(x.starts_at))}`;
+function renderReports(){
+  if(S.tab!=="reportes")return;
+  document.querySelectorAll("[data-rview]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.rview===R.view)));
+  document.querySelectorAll("[data-rsf]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.rsf===R.sf)));
+  if($("#r-from").value!==R.from)$("#r-from").value=R.from;
+  if($("#r-to").value!==R.to)$("#r-to").value=R.to;
+  $("#r-qwrap").hidden=R.view!=="cliente";$("#r-sf").hidden=R.view!=="simpe";
+  const sum=$("#r-sum"),body=$("#r-body");
+  if(R.err==="off"){sum.innerHTML="";body.innerHTML=`<div class="card muted">Falta activar los reportes: ejecuta el archivo supabase/reports.sql en el SQL Editor de Supabase (proyecto spinning-reservas).</div>`;return}
+  if(R.err){sum.innerHTML="";body.innerHTML=`<div class="card muted">${esc(R.err)}</div>`;return}
+  if(R.rows===null){sum.innerHTML="";body.innerHTML=`<div class="card muted">Cargando…</div>`;return}
+  const res=R.rows.filter(x=>x.res_id),paid=res.filter(x=>x.paid).length;
+  const kp=(a,b)=>`<div class="kpi"><b>${esc(a)}</b><span>${esc(b)}</span></div>`;
+  if(R.view==="clase"){
+    const cl=new Map();for(const x of R.rows){if(!cl.has(x.class_id))cl.set(x.class_id,{c:x,items:[]});if(x.res_id)cl.get(x.class_id).items.push(x)}
+    const cap=[...cl.values()].reduce((n,v)=>n+v.c.capacity,0);
+    sum.innerHTML=`<div class="kpis">${kp(cl.size,"Clases")}${kp(res.length+(cap?` · ${Math.round(res.length/cap*100)}%`:""),"Reservas · ocupación")}${kp(money(paid*PRICE_N),`Cobrado (${paid})`)}${kp(money((res.length-paid)*PRICE_N),`Pendiente (${res.length-paid})`)}</div>`;
+    body.innerHTML=cl.size?[...cl.values()].map(({c,items})=>{
+      const pd=items.filter(x=>x.paid).length,sp=items.filter(x=>!x.paid&&x.method==="simpe").length;
+      return `<details class="card rep"><summary><span><b>${esc(rWhen(c))}</b><br><span class="muted" style="font-size:.8rem">${esc(c.title)}${c.instructor?" · "+esc(c.instructor):""}</span></span><span style="text-align:right"><span class="pill${items.length>=c.capacity?" full":""}">${items.length}/${c.capacity}</span><br><span class="muted" style="font-size:.75rem">${pd} pagadas${sp?` · ${sp} por revisar`:""}</span></span></summary>${items.length?items.map(x=>`<div class="rost"><span>Bici ${x.bike} · ${esc(rName(x))}</span><span class="muted">${esc(rStatus(x))}</span></div>`).join(""):`<div class="muted" style="font-size:.85rem">Sin reservas.</div>`}</details>`}).join(""):`<div class="card muted">No hay clases en ese periodo.</div>`;
+  }else if(R.view==="cliente"){
+    const cu=new Map();for(const x of res){if(!cu.has(x.user_id))cu.set(x.user_id,{u:x,items:[]});cu.get(x.user_id).items.push(x)}
+    const q=R.q.trim().toLowerCase();
+    const list=[...cu.values()].filter(v=>!q||`${v.u.display_name||""} ${v.u.email||""}`.toLowerCase().includes(q)).sort((a,b)=>b.items.length-a.items.length||rName(a.u).localeCompare(rName(b.u)));
+    sum.innerHTML=`<div class="kpis">${kp(cu.size,"Clientes con reservas")}${kp(res.length,"Reservas")}${kp(money(paid*PRICE_N),`Cobrado (${paid})`)}${kp(money((res.length-paid)*PRICE_N),`Pendiente (${res.length-paid})`)}</div>`;
+    body.innerHTML=list.length?list.map(({u,items})=>{
+      const pd=items.filter(x=>x.paid).length;
+      return `<details class="card rep"><summary><span><b>${esc(rName(u))}</b><br><span class="muted" style="font-size:.78rem">${esc(u.email||"")}</span></span><span style="text-align:right"><span class="pill">${items.length} ${items.length===1?"clase":"clases"}</span><br><span class="muted" style="font-size:.75rem">${pd} pagadas${items.length-pd?` · debe ${money((items.length-pd)*PRICE_N)}`:""}</span></span></summary>${items.map(x=>`<div class="rost"><span>${esc(rWhen(x))} · bici ${x.bike}</span><span class="muted">${esc(rStatus(x))}</span></div>`).join("")}</details>`}).join(""):`<div class="card muted">Sin resultados.</div>`;
+  }else{
+    const sp=res.filter(x=>x.method==="simpe"),ok=sp.filter(x=>x.paid),rev=sp.filter(x=>!x.paid);
+    sum.innerHTML=`<div class="kpis">${kp(sp.length,"SIMPE recibidos")}${kp(money(ok.length*PRICE_N),`Confirmados (${ok.length})`)}${kp(rev.length,"Por revisar")}${kp(money(rev.length*PRICE_N),"Por confirmar")}</div>`;
+    const list=sp.filter(x=>R.sf==="todos"||(R.sf==="revisar"?!x.paid:x.paid)).sort((a,b)=>new Date(b.pay_at||0)-new Date(a.pay_at||0));
+    body.innerHTML=list.length?list.map(x=>`<div class="card stack" style="gap:8px"><div class="rost" style="border:0;padding:0"><span><b>${esc(rName(x))}</b><br><span class="muted" style="font-size:.78rem">${esc(x.email||"")}</span></span><span class="pill${x.paid?"":" mine"}">${x.paid?"Pagado ✓":"Por revisar"}</span></div><div class="muted" style="font-size:.82rem">${esc(rWhen(x))} · bici ${x.bike} · ${esc(money(PRICE_N))}${x.pay_at?` · enviado ${esc(fShort.format(new Date(x.pay_at)))}`:""}</div><div class="row2" style="gap:8px">${x.proof_path?`<button class="btn ghost" type="button" data-rproof="${esc(x.res_id)}" style="padding:8px">Ver comprobante</button>`:`<span></span>`}<button class="btn ${x.paid?"ghost":"eat"}" type="button" data-rpaid="${esc(x.res_id)}" style="padding:8px">${x.paid?"Quitar «pagado»":"Marcar pagado"}</button></div></div>`).join(""):`<div class="card muted">No hay SIMPE en este periodo.</div>`;
+  }
+}
+document.querySelectorAll("[data-rview]").forEach(b=>b.onclick=()=>{R.view=b.dataset.rview;renderReports()});
+document.querySelectorAll("[data-rsf]").forEach(b=>b.onclick=()=>{R.sf=b.dataset.rsf;renderReports()});
+document.querySelectorAll("[data-rpre]").forEach(b=>b.onclick=()=>{[R.from,R.to]=presetRange(b.dataset.rpre);loadReport()});
+$("#r-from").onchange=e=>{R.from=e.target.value;loadReport()};
+$("#r-to").onchange=e=>{R.to=e.target.value;loadReport()};
+$("#r-q").oninput=e=>{R.q=e.target.value;renderReports()};
+$("#r-body").addEventListener("click",async e=>{
+  const pr=e.target.closest("[data-rproof]");
+  if(pr){const x=(R.rows||[]).find(y=>y.res_id===pr.dataset.rproof);if(x?.proof_path)showProofPath(x.proof_path,`${rName(x)} · ${rWhen(x)} · bici ${x.bike}`);return}
+  const pd=e.target.closest("[data-rpaid]");
+  if(pd){const x=(R.rows||[]).find(y=>y.res_id===pd.dataset.rpaid);if(!x)return;pd.disabled=true;
+    const r=await sb.rpc("spin_set_paid",{p_res:x.res_id,p_paid:!x.paid});
+    if(r.error){pd.disabled=false;toast(dbError(r.error));return}
+    toast(x.paid?"Pago desmarcado":"Marcado como pagado");loadReport();loadData().then(renderAll).catch(()=>{});
+  }
+});
+// CSV of the rows behind the current report (opens fine in Excel / Google Sheets)
+$("#r-csv").onclick=()=>{
+  if(!R.rows?.length){toast("No hay datos para descargar");return}
+  const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  let rows=R.rows.filter(x=>x.res_id);if(R.view==="simpe")rows=rows.filter(x=>x.method==="simpe");
+  const head=["Fecha","Hora","Clase","Instructor","Bici","Cliente","Correo","Forma de pago","Estado","Monto"];
+  const lines=rows.map(x=>[crParts(x.starts_at).date,fTime.format(new Date(x.starts_at)),x.title,x.instructor,x.bike,rName(x),x.email,x.method==="simpe"?"SIMPE":x.method==="local"?"En el lugar":"Sin indicar",x.paid?"Pagado":"Pendiente",PRICE_N].map(q).join(","));
+  const blob=new Blob(["\ufeff"+[head.map(q).join(","),...lines].join("\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`reporte-rpm-${R.from}_${R.to}.csv`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+};
 
 /* ---------- profile name ---------- */
 async function loadProfile(){
