@@ -360,6 +360,10 @@ const fWd=new Intl.DateTimeFormat("es-CR",{weekday:"short"});
 const fDn=new Intl.DateTimeFormat("es-CR",{day:"numeric",month:"short"});
 const cap1=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const started=c=>new Date(c.starts_at)<=new Date();
+// Clients can cancel only until 4 hours before the class (admins always can); the database enforces it too (supabase/cancel_window.sql)
+const CANCEL_MIN_H=4;
+const canCancel=c=>S.admin||new Date(c.starts_at)-Date.now()>CANCEL_MIN_H*36e5;
+const NO_CANCEL_MSG="Ya no se puede cancelar: solo se puede hasta 4 horas antes de la clase.";
 
 /* ---------- room geometry: 26 bikes in 3 concentric arcs around the instructor, numbered front to back like cinema seats ---------- */
 const ROWS=[{n:6,r:62},{n:9,r:112},{n:11,r:162}],CX=180,CY=58,SPAN=80;
@@ -613,8 +617,10 @@ async function book(c,bike,pay){
   await loadData();renderAll();
 }
 async function cancel(r){
+  const c=S.classes.find(x=>x.id===r.class_id);
+  if(c&&!canCancel(c)){toast(NO_CANCEL_MSG);return}
   const d=await sb.from("spin_reservations").delete().eq("id",r.id);
-  if(d.error)toast(dbError(d.error));else toast("Reserva cancelada");
+  if(d.error)toast(/row-level security|42501/i.test(d.error.message||d.error.code||"")?NO_CANCEL_MSG:dbError(d.error));else toast("Reserva cancelada");
   await loadData();renderAll();
 }
 /* ---------- payment: SIMPE proof or pay at the studio ---------- */
@@ -696,7 +702,7 @@ function seatAction(el){
     const acts=[];
     if(S.pay&&!payOf(r)?.paid)acts.push({label:payOf(r)?"Cambiar forma de pago":"Indicar forma de pago",cls:"eat",fn:()=>later(()=>paySheet("Forma de pago",`Bici ${bike} · ${when}.`,"Guardar",(m,p)=>setPay(r,m,p)))});
     acts.push({label:"Cancelar mi reserva",cls:"burn",fn:()=>cancel(r)});
-    return sheet(`Bici ${bike}`,`Es tu reserva${r.hold_id?" fija":""} de ${when}.${S.pay?" "+payLabel(r)+".":""}${r.hold_id?" Si la cancelas, solo se libera esta clase.":""}`,acts);
+    return sheet(`Bici ${bike}`,`Es tu reserva${r.hold_id?" fija":""} de ${when}.${S.pay?" "+payLabel(r)+".":""}${r.hold_id?" Si la cancelas, solo se libera esta clase.":""}${canCancel(c)?"":" "+NO_CANCEL_MSG}`,acts);
   }
   if(r){
     if(S.admin){const a=[...payActions(r),{label:"Quitar esta reserva",cls:"burn",fn:()=>cancel(r)}];if(S.holds!==null)a.push({label:"Bloquear esta bici de esta clase en adelante",cls:"ghost",fn:()=>quickBlock(c,bike)});return sheet(`Bici ${bike}`,`Reservada por ${whoIs(r.user_id).name}${whoIs(r.user_id).email?" ("+whoIs(r.user_id).email+")":""}.${S.pay?" "+payLabel(r)+".":""}`,a)}
